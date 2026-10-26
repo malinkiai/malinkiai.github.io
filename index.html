@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ru" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Малинки AI для школ — Автоматизация конспектов уроков</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Убираем стандартные стрелочки у поля ввода числа для красоты */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="bg-rose-50/40 text-indigo-950 antialiased overflow-x-hidden">
+
+    <!-- 1. ПЕРВЫЙ ЭКРАН -->
+    <section class="relative min-h-screen flex flex-col justify-between bg-gradient-to-br from-rose-100/70 via-white to-pink-50/80 px-4 sm:px-6 lg:px-8 py-6 overflow-hidden">
+        
+        <!-- Декоративные розовые островки на фоне -->
+        <div class="absolute top-12 left-10 w-72 h-72 bg-pink-300/30 rounded-full blur-3xl -z-10 pointer-events-none"></div>
+        <div class="absolute bottom-16 right-10 w-80 h-80 bg-rose-300/30 rounded-full blur-3xl -z-10 pointer-events-none"></div>
+
+        <header class="max-w-5xl w-full mx-auto flex justify-between items-center py-2 relative z-10">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-9 h-9 bg-gradient-to-tr from-rose-600 to-pink-500 rounded-xl shadow-md shadow-rose-500/30 flex items-center justify-center text-white font-bold text-lg">AI</div>
+                <span class="font-extrabold text-xl tracking-tight text-indigo-950">Малинки</span>
+            </div>
+            <span class="text-xs sm:text-sm font-semibold bg-rose-100 text-rose-800 border border-rose-200 px-3.5 py-1 rounded-full shadow-sm">Решение для учебных заведений</span>
+        </header>
+
+        <div class="max-w-3xl mx-auto text-center my-auto py-8 relative z-10">
+            <!-- Заголовок (8 слов) — Глубокий темно-синий -->
+            <h1 class="text-3xl sm:text-5xl md:text-6xl font-extrabold text-indigo-950 tracking-tight leading-tight mb-6">
+                Директор, обеспечьте учеников готовыми конспектами после каждого урока
+            </h1>
+            <!-- Подзаголовок (14 слов — учтены и голос, и экран) -->
+            <p class="text-lg sm:text-xl text-indigo-900/80 mb-10 max-w-2xl mx-auto leading-relaxed">
+                Выдайте педагогам флешки-диктофоны, которые собирают речь и слайды с экрана в готовые конспекты.
+            </p>
+            <!-- Кнопка (3 слова) -->
+            <div>
+                <a href="#order" class="inline-block bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-semibold text-lg px-8 py-4 rounded-xl shadow-lg shadow-rose-600/30 transition transform hover:-translate-y-0.5">
+                    Запросить тестовый комплект
+                </a>
+            </div>
+            <!-- Доказательство -->
+            <div class="mt-8 inline-flex items-center justify-center space-x-2 bg-emerald-50 border border-emerald-200 px-5 py-2.5 rounded-full shadow-sm">
+                <svg class="w-5 h-5 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+                <span class="text-sm font-medium text-emerald-900">
+                    Помогает пропустившим уроки ученикам легко освоить тему по готовым материалам.
+                </span>
+            </div>
+        </div>
+
+        <div class="text-center text-rose-400 font-medium text-xs pb-2 relative z-10">
+            Листайте вниз, чтобы узнать детали ↓
+        </div>
+    </section>
+
+    <!-- 2. ДЛЯ КОГО (Глубокий темно-синий фон с малиновым отливом) -->
+    <section class="py-20 bg-gradient-to-br from-blue-950 via-indigo-950 to-rose-950 text-white px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+        <!-- Легкое малиновое свечение внутри темно-синего блока -->
+        <div class="absolute -top-24 -right-24 w-96 h-96 bg-rose-500/15 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -bottom-24 -left-24 w-96 h-96 bg-blue-500/15 rounded-full blur-3xl pointer-events-none"></div>
+        
+        <div class="max-w-3xl mx-auto text-center relative z-10">
+            <h2 class="text-2xl sm:text-3xl font-bold mb-6 text-rose-200">Для кого создан проект</h2>
+            <p class="text-lg sm:text-xl text-blue-50 leading-relaxed bg-white/5 backdrop-blur-sm p-6 sm:p-8 rounded-2xl border border-indigo-300/20 shadow-inner">
+                Для директора и завуча школы, которым нужно оцифровать уроки (голос учителя и материалы с интерактивной доски) и дать ученикам понятные конспекты без перенастройки школьных ПК. В классах установлен запрет на скачивание сторонних программ, поэтому устройство запускается без установки драйверов, не требует участия системного администратора и открыто сигнализирует о записи световым индикатором.
+            </p>
+        </div>
+    </section>
+
+    <!-- 3. КАК ЭТО РАБОТАЕТ -->
+    <section class="py-20 bg-white px-4 sm:px-6 lg:px-8 border-t border-rose-100">
+        <div class="max-w-5xl mx-auto">
+            <h2 class="text-2xl sm:text-3xl font-bold text-center text-indigo-950 mb-12">Как это работает в школе</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Островок 1 (Малиновый с темно-синим текстом) -->
+                <div class="bg-gradient-to-b from-rose-50/90 to-pink-50/40 p-6 sm:p-8 rounded-2xl border border-rose-200/80 shadow-sm hover:shadow-md transition">
+                    <div class="w-12 h-12 bg-gradient-to-br from-rose-500 to-pink-600 text-white font-bold text-xl rounded-xl shadow-md shadow-rose-500/20 flex items-center justify-center mb-6">1</div>
+                    <h3 class="font-bold text-lg text-indigo-950 mb-2">Выдача</h3>
+                    <p class="text-indigo-900/80 leading-relaxed">Администрация школы выдает учителям настроенные флешки-диктофоны перед началом четверти.</p>
+                </div>
+                <!-- Островок 2 (Малиновый с темно-синим текстом) -->
+                <div class="bg-gradient-to-b from-rose-50/90 to-pink-50/40 p-6 sm:p-8 rounded-2xl border border-rose-200/80 shadow-sm hover:shadow-md transition">
+                    <div class="w-12 h-12 bg-gradient-to-br from-rose-500 to-pink-600 text-white font-bold text-xl rounded-xl shadow-md shadow-rose-500/20 flex items-center justify-center mb-6">2</div>
+                    <h3 class="font-bold text-lg text-indigo-950 mb-2">Захват экрана и речи</h3>
+                    <p class="text-indigo-900/80 leading-relaxed">Учитель вставляет устройство в школьный ПК и нажимает кнопку — в фоне пишется голос и снимки экрана.</p>
+                </div>
+                <!-- Островок 3 (Малиновый с темно-синим текстом) -->
+                <div class="bg-gradient-to-b from-rose-50/90 to-pink-50/40 p-6 sm:p-8 rounded-2xl border border-rose-200/80 shadow-sm hover:shadow-md transition">
+                    <div class="w-12 h-12 bg-gradient-to-br from-rose-500 to-pink-600 text-white font-bold text-xl rounded-xl shadow-md shadow-rose-500/20 flex items-center justify-center mb-6">3</div>
+                    <h3 class="font-bold text-lg text-indigo-950 mb-2">Готовый материал</h3>
+                    <p class="text-indigo-900/80 leading-relaxed">После звонка педагог нажимает кнопку повторно и забирает с флешки структурированный Word-конспект.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. СКОЛЬКО СТОИТ -->
+    <section class="py-20 bg-white px-4 sm:px-6 lg:px-8 border-t border-rose-100">
+        <div class="max-w-3xl mx-auto">
+            <h2 class="text-2xl sm:text-3xl font-bold text-center text-indigo-950 mb-10">Сколько стоит</h2>
+            <div class="bg-gradient-to-br from-rose-50 via-pink-50/80 to-rose-100/60 border border-rose-200 rounded-3xl p-6 sm:p-10 shadow-sm">
+                
+                <!-- Поле выбора количества устройств -->
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-3 mb-8 bg-rose-100/70 backdrop-blur-sm py-3.5 px-6 rounded-2xl border-2 border-rose-300 max-w-md mx-auto shadow-sm">
+                    <label for="deviceCount" class="text-sm font-bold text-indigo-950">Количество устройств:</label>
+                    <div class="flex items-center space-x-1.5">
+                        <button type="button" onclick="changeCount(-1)" class="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white font-bold flex items-center justify-center shadow-sm transition cursor-pointer">−</button>
+                        <input type="number" id="deviceCount" value="20" min="1" max="999" class="w-20 text-center font-extrabold text-lg text-indigo-950 bg-white border-2 border-rose-400 rounded-xl py-1 focus:outline-none focus:ring-2 focus:ring-rose-600">
+                        <button type="button" onclick="changeCount(1)" class="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white font-bold flex items-center justify-center shadow-sm transition cursor-pointer">+</button>
+                    </div>
+                </div>
+
+                <p class="text-center text-lg sm:text-xl font-medium text-indigo-950 mb-8">
+                    Школа по договору платит <span class="font-bold text-rose-700 bg-rose-200/70 px-2 py-0.5 rounded-md"><span id="textTotalHw">130 000</span> рублей</span> единоразово за комплект из <span id="textCount1" class="font-bold text-rose-800">20</span> физических устройств и <span class="font-bold text-rose-700 bg-rose-200/70 px-2 py-0.5 rounded-md"><span id="textTotalSub">10 000</span> рублей</span> ежемесячно за облачную лицензию нейросетей для расшифровки речи и структурирования конспектов.
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6 border-t border-rose-200/80">
+                    <!-- Первая карточка цены -->
+                    <div class="bg-white p-6 rounded-2xl border-2 border-rose-200 text-center shadow-sm">
+                        <div class="text-xs font-bold uppercase tracking-wider text-rose-500 mb-1">Закупка оборудования</div>
+                        <div class="text-3xl font-extrabold text-indigo-950 mb-1"><span id="cardTotalHw">130 000</span> ₽</div>
+                        <div class="text-sm text-indigo-900/75">Комплект из <span id="cardCount1">20</span> устройств (6 500 ₽ за шт.)</div>
+                    </div>
+                    <!-- Вторая карточка цены -->
+                    <div class="bg-white p-6 rounded-2xl border-2 border-rose-200 text-center shadow-sm">
+                        <div class="text-xs font-bold uppercase tracking-wider text-rose-500 mb-1">Подписка на нейросети</div>
+                        <div class="text-3xl font-extrabold text-indigo-950 mb-1"><span id="cardTotalSub">10 000</span> ₽ / мес</div>
+                        <div class="text-sm text-indigo-900/75">Облачная обработка аудио и экрана для <span id="cardCount2">20</span> учителей</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 5. ПРИЗЫВ К ДЕЙСТВИЮ -->
+    <section id="order" class="py-20 bg-gradient-to-b from-rose-50/70 to-pink-100/50 px-4 sm:px-6 lg:px-8 border-t border-rose-200/60">
+        <div class="max-w-xl mx-auto bg-white p-8 sm:p-10 rounded-3xl shadow-xl shadow-indigo-950/5 border border-rose-200 text-center">
+            <h2 class="text-2xl font-bold text-indigo-950 mb-3">Консультация и пилотное тестирование</h2>
+            <p class="text-indigo-900/80 mb-6">
+                Оставьте контактные данные учебного заведения. Мы ответим на технические вопросы, сформируем коммерческое предложение и организуем передачу устройств на тест без обязательств.
+            </p>
+            <form id="leadForm" class="space-y-4 text-left">
+                <div>
+                    <label class="block text-sm font-semibold text-indigo-950 mb-1">ФИО руководителя и номер школы</label>
+                    <input type="text" name="school_info" placeholder="Иванов И.И., ГБОУ Школа № 1234" required class="w-full px-4 py-3 rounded-xl border border-rose-200 bg-rose-50/30 text-indigo-950 placeholder-indigo-900/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500 transition">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-indigo-950 mb-1">Рабочий телефон или Email</label>
+                    <input type="text" name="contact" placeholder="+7 (999) 000-00-00 или director@school.ru" required class="w-full px-4 py-3 rounded-xl border border-rose-200 bg-rose-50/30 text-indigo-950 placeholder-indigo-900/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500 transition">
+                </div>
+                <button type="submit" class="w-full bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-semibold py-4 rounded-xl shadow-md shadow-rose-500/25 transition cursor-pointer mt-2">
+                    Запросить консультацию
+                </button>
+            </form>
+            <div id="success-msg" class="hidden mt-4 p-4 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-sm font-medium">
+                Заявка успешно отправлена! Мы свяжемся со школой для консультации и передачи тестового комплекта.
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-indigo-950 text-indigo-200/70 py-6 text-center text-sm border-t border-indigo-900">
+        <p>© Программно-аппаратный комплекс «Малинки AI» для образовательных учреждений</p>
+    </footer>
+
+    <script>
+        // Калькулятор стоимости устройств
+        const deviceInput = document.getElementById('deviceCount');
+        const PRICE_PER_DEVICE = 6500;
+        const SUB_PER_DEVICE = 500; // 10 000 ₽ за 20 устройств = 500 ₽ за 1 устройство
+
+        function formatNum(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+        }
+
+        function updateCalculator() {
+            let count = parseInt(deviceInput.value);
+            if (isNaN(count) || count < 1) {
+                count = 1;
+            }
+            const totalHw = count * PRICE_PER_DEVICE;
+            const totalSub = count * SUB_PER_DEVICE;
+
+            document.getElementById('textTotalHw').textContent = formatNum(totalHw);
+            document.getElementById('textTotalSub').textContent = formatNum(totalSub);
+            document.getElementById('textCount1').textContent = count;
+
+            document.getElementById('cardTotalHw').textContent = formatNum(totalHw);
+            document.getElementById('cardTotalSub').textContent = formatNum(totalSub);
+            document.getElementById('cardCount1').textContent = count;
+            document.getElementById('cardCount2').textContent = count;
+        }
+
+        function changeCount(delta) {
+            let current = parseInt(deviceInput.value) || 20;
+            let next = current + delta;
+            if (next >= 1 && next <= 999) {
+                deviceInput.value = next;
+                updateCalculator();
+            }
+        }
+
+        deviceInput.addEventListener('input', updateCalculator);
+        deviceInput.addEventListener('blur', function() {
+            if (!this.value || parseInt(this.value) < 1) {
+                this.value = 1;
+                updateCalculator();
+            }
+        });
+
+        // Обработка формы заявки
+        document.getElementById('leadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const schoolInfo = formData.get('school_info');
+            const contact = formData.get('contact');
+
+            const leads = JSON.parse(localStorage.getItem('malinki_leads') || '[]');
+            leads.push({
+                timestamp: new Date().toLocaleString('ru-RU'),
+                school_info: schoolInfo,
+                contact: contact
+            });
+            localStorage.setItem('malinki_leads', JSON.stringify(leads));
+
+            document.getElementById('success-msg').classList.remove('hidden');
+            this.reset();
+        });
+    </script>
+</body>
+</html>
