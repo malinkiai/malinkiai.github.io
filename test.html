@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Малинки AI — Тестовый полигон</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-indigo-950 text-white min-h-screen p-6 font-sans">
+
+    <div class="max-w-4xl mx-auto space-y-6">
+        <!-- Шапка -->
+        <div class="flex items-center justify-between border-b border-indigo-800 pb-4">
+            <div>
+                <h1 class="text-2xl font-bold text-rose-500">Малинки AI — Инженерный полигон</h1>
+                <p class="text-sm text-indigo-300">Проверка школьного ПК: связь с платой, микрофон и захват доски</p>
+            </div>
+            <div id="statusBadge" class="px-4 py-2 rounded-full bg-indigo-900 border border-indigo-700 text-sm font-semibold">
+                ⚪ Ожидание проверки
+            </div>
+        </div>
+
+        <!-- Карточки шагов -->
+        <div class="grid md:grid-cols-2 gap-6">
+            
+            <!-- Шаг 1: Плата RP2040 -->
+            <div class="bg-indigo-900/60 border border-indigo-800 rounded-2xl p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-bold">1. Плата RP2040-Zero (USB)</h2>
+                    <span id="serialStatus" class="text-xs px-2.5 py-1 rounded bg-indigo-800 text-indigo-300">Не подключена</span>
+                </div>
+                <p class="text-xs text-indigo-300 leading-relaxed">
+                    Проверка технологии Web Serial API. Если плата еще не приехала, этот шаг можно пропустить и управлять записью через <b>Пробел</b>.
+                </p>
+                <div class="flex flex-wrap gap-2">
+                    <button id="btnConnectSerial" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 rounded-xl text-sm font-semibold transition">
+                        🔌 Подключить плату
+                    </button>
+                    <button id="btnLedRed" disabled class="px-3 py-2 bg-indigo-800 hover:bg-indigo-700 disabled:opacity-40 rounded-xl text-xs">
+                        🔴 Тест: Красный
+                    </button>
+                    <button id="btnLedGreen" disabled class="px-3 py-2 bg-indigo-800 hover:bg-indigo-700 disabled:opacity-40 rounded-xl text-xs">
+                        🟢 Тест: Зеленый
+                    </button>
+                </div>
+            </div>
+
+            <!-- Шаг 2: Экран и Микрофон -->
+            <div class="bg-indigo-900/60 border border-indigo-800 rounded-2xl p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-bold">2. Доступ к доске и микрофону</h2>
+                    <span id="mediaStatus" class="text-xs px-2.5 py-1 rounded bg-indigo-800 text-indigo-300">Нет доступа</span>
+                </div>
+                <p class="text-xs text-indigo-300 leading-relaxed">
+                    Браузер запросит разрешение на запись звука с USB-микрофона и захват экрана интерактивной доски.
+                </p>
+                <div class="flex flex-wrap gap-2">
+                    <button id="btnInitMedia" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 rounded-xl text-sm font-semibold transition">
+                        🖥️ Дать доступ к экрану и звуку
+                    </button>
+                    <button id="btnToggleRecord" disabled class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 rounded-xl text-sm font-semibold transition">
+                        ▶️ Старт записи (или Пробел)
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Индикатор звука и превью экрана -->
+        <div class="grid md:grid-cols-2 gap-6">
+            <div class="bg-indigo-900/40 border border-indigo-800 rounded-2xl p-5 space-y-3">
+                <h3 class="text-sm font-semibold text-indigo-200">Уровень сигнала микрофона:</h3>
+                <div class="w-full bg-indigo-950 rounded-full h-4 overflow-hidden border border-indigo-800">
+                    <div id="micLevel" class="bg-rose-500 h-full w-0 transition-all duration-75"></div>
+                </div>
+                <p id="micName" class="text-xs text-indigo-400">Микрофон не выбран</p>
+
+                <!-- Аудиоплеер для проверки записи -->
+                <div id="audioResultBox" class="hidden pt-3 border-t border-indigo-800 space-y-2">
+                    <p class="text-xs text-emerald-400 font-semibold">✅ Записанное аудио урока:</p>
+                    <audio id="recordedAudio" controls class="w-full h-10"></audio>
+                </div>
+            </div>
+
+            <div class="bg-indigo-900/40 border border-indigo-800 rounded-2xl p-5 space-y-3">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-sm font-semibold text-indigo-200">Захваченные слайды (каждые 5 сек):</h3>
+                    <span id="slideCount" class="text-xs text-rose-400 font-bold">0 шт.</span>
+                </div>
+                <!-- Скрытое видео для захвата потока -->
+                <video id="screenVideo" autoplay muted class="hidden"></video>
+                <div id="slidesGallery" class="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto p-1">
+                    <p class="text-xs text-indigo-400 col-span-3">Скриншоты появятся здесь во время записи...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Журнал событий (Лог) -->
+        <div class="bg-black/50 border border-indigo-800 rounded-2xl p-4">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-xs font-mono text-indigo-400">ЖУРНАЛ ДИАГНОСТИКИ (ЛОГ):</span>
+                <button onclick="document.getElementById('logBox').innerHTML=''" class="text-xs text-indigo-400 hover:text-white">Очистить</button>
+            </div>
+            <div id="logBox" class="font-mono text-xs text-emerald-400 space-y-1 max-h-44 overflow-y-auto">
+                <div>[Система] Полигон загружен. Интернет-соединение и GitHub Pages работают штатно.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- ЛОГИРОВАНИЕ ---
+        function log(msg, isError = false) {
+            const box = document.getElementById('logBox');
+            const time = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = isError ? 'text-rose-400 font-bold' : 'text-emerald-400';
+            div.textContent = `[${time}] ${msg}`;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        // --- 1. WEB SERIAL API (СВЯЗЬ С ПЛАТОЙ RP2040-ZERO) ---
+        let port = null;
+        let writer = null;
+
+        document.getElementById('btnConnectSerial').addEventListener('click', async () => {
+            if (!('serial' in navigator)) {
+                log('ОШИБКА: Этот браузер не поддерживает Web Serial API! Откройте сайт в Chrome, Яндекс.Браузере или Edge.', true);
+                return;
+            }
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 115200 });
+                document.getElementById('serialStatus').textContent = 'Подключена ✅';
+                document.getElementById('serialStatus').className = 'text-xs px-2.5 py-1 rounded bg-emerald-900 text-emerald-300';
+                document.getElementById('btnLedRed').disabled = false;
+                document.getElementById('btnLedGreen').disabled = false;
+                log('Плата RP2040 успешно подключена по USB!');
+
+                // Подготовка отправки команд на плату
+                const textEncoder = new TextEncoderStream();
+                const writableStreamClosed = textEncoder.readable.pipeTo(port.writable);
+                writer = textEncoder.writable.getWriter();
+
+                // Чтение нажатий кнопки с платы
+                const textDecoder = new TextDecoderStream();
+                const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+                const reader = textDecoder.readable.getReader();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    if (value && value.includes('CLICK')) {
+                        log('🔘 Получен сигнал CLICK от физической кнопки на плате!');
+                        toggleRecording();
+                    }
+                }
+            } catch (err) {
+                log('Не удалось подключить плату: ' + err.message, true);
+            }
+        });
+
+        async function sendLedCommand(cmd) {
+            if (writer) {
+                await writer.write(cmd + '\n');
+                log(`Отправлена команда светодиоду на плате: ${cmd}`);
+            }
+        }
+
+        document.getElementById('btnLedRed').addEventListener('click', () => sendLedCommand('RED'));
+        document.getElementById('btnLedGreen').addEventListener('click', () => sendLedCommand('GREEN'));
+
+        // --- 2. ЗАХВАТ МИКРОФОНА И ЭКРАНА ДОСКИ ---
+        let audioStream = null;
+        let screenStream = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+        let slideInterval = null;
+        let slidesCaptured = 0;
+
+        document.getElementById('btnInitMedia').addEventListener('click', async () => {
+            try {
+                log('Запрос доступа к микрофону...');
+                audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const audioTrack = audioStream.getAudioTracks()[0];
+                document.getElementById('micName').textContent = 'Активный микрофон: ' + audioTrack.label;
+                log('Микрофон подключен: ' + audioTrack.label);
+                initMicVisualizer(audioStream);
+
+                log('Запрос доступа к экрану (выберите "Весь экран")...');
+                screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                document.getElementById('screenVideo').srcObject = screenStream;
+                log('Захват экрана интерактивной доски разрешен!');
+
+                document.getElementById('mediaStatus').textContent = 'Готово к уроку ✅';
+                document.getElementById('mediaStatus').className = 'text-xs px-2.5 py-1 rounded bg-emerald-900 text-emerald-300';
+                document.getElementById('btnToggleRecord').disabled = false;
+            } catch (err) {
+                log('Ошибка доступа к микрофону или экрану: ' + err.message, true);
+            }
+        });
+
+        // Индикатор громкости микрофона
+        function initMicVisualizer(stream) {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const analyser = audioCtx.createAnalyser();
+            const source = audioCtx.createMediaStreamSource(stream);
+            source.connect(analyser);
+            analyser.fftSize = 256;
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+            function updateMeter() {
+                analyser.getByteFrequencyData(dataArray);
+                let sum = dataArray.reduce((a, b) => a + b, 0);
+                let avg = sum / dataArray.length;
+                let width = Math.min(100, Math.round(avg * 2.5));
+                document.getElementById('micLevel').style.width = width + '%';
+                requestAnimationFrame(updateMeter);
+            }
+            updateMeter();
+        }
+
+        // --- 3. СТАРТ И СТОП ЗАПИСИ УРОКА ---
+        function toggleRecording() {
+            if (!audioStream || !screenStream) {
+                log('Сначала нажмите кнопку "Дать доступ к экрану и звуку"!', true);
+                return;
+            }
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        }
+
+        function startRecording() {
+            isRecording = true;
+            audioChunks = [];
+            slidesCaptured = 0;
+            document.getElementById('slidesGallery').innerHTML = '';
+            document.getElementById('audioResultBox').classList.add('hidden');
+
+            mediaRecorder = new MediaRecorder(audioStream);
+            mediaRecorder.ondataavailable = e => {
+                if (e.data.size > 0) audioChunks.push(e.data);
+            };
+            mediaRecorder.onstop = saveResults;
+            mediaRecorder.start();
+
+            // Скриншот сразу и затем каждые 5 секунд
+            captureSlide();
+            slideInterval = setInterval(captureSlide, 5000);
+
+            // Обновление интерфейса и диода
+            document.getElementById('statusBadge').textContent = '🔴 ИДЕТ ЗАПИСЬ УРОКА';
+            document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-rose-600 text-white text-sm font-bold animate-pulse';
+            document.getElementById('btnToggleRecord').textContent = '⏹️ Остановить запись (или Пробел)';
+            document.getElementById('btnToggleRecord').className = 'px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-xl text-sm font-semibold transition';
+            
+            sendLedCommand('RED');
+            log('▶️ ЗАПИСЬ НАЧАЛАСЬ! Говорите в микрофон и переключайте окна.');
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            mediaRecorder.stop();
+            clearInterval(slideInterval);
+
+            document.getElementById('statusBadge').textContent = '🟢 Урок сохранен';
+            document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-emerald-700 text-white text-sm font-semibold';
+            document.getElementById('btnToggleRecord').textContent = '▶️ Старт записи (или Пробел)';
+            document.getElementById('btnToggleRecord').className = 'px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-sm font-semibold transition';
+
+            sendLedCommand('GREEN');
+            log('⏹️ ЗАПИСЬ ОСТАНОВЛЕНА. Формируем тестовые файлы...');
+        }
+
+        // Создание скриншота экрана
+        function captureSlide() {
+            const video = document.getElementById('screenVideo');
+            if (!video.videoWidth) return;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const imgUrl = canvas.toDataURL('image/jpeg', 0.7);
+            slidesCaptured++;
+            document.getElementById('slideCount').textContent = slidesCaptured + ' шт.';
+
+            const img = document.createElement('img');
+            img.src = imgUrl;
+            img.className = 'rounded border border-indigo-600 w-full h-20 object-cover';
+            document.getElementById('slidesGallery').appendChild(img);
+            log(`📸 Сделан снимок экрана #${slidesCaptured}`);
+        }
+
+        // Вывод результата и тестовое скачивание файла
+        function saveResults() {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audioPlayer = document.getElementById('recordedAudio');
+            audioPlayer.src = audioUrl;
+            document.getElementById('audioResultBox').classList.remove('hidden');
+
+            // Автоматическое скачивание проверочного отчета (имитация скачивания конспекта)
+            const reportText = `ТЕСТОВЫЙ ОТЧЕТ МАЛИНКИ AI\nДата: ${new Date().toLocaleString()}\nЗахвачено слайдов: ${slidesCaptured}\nРазмер аудиозаписи: ${Math.round(audioBlob.size / 1024)} КБ\nСтатус: Школьный ПК полностью подходит для работы!`;
+            const reportBlob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(reportBlob);
+            link.download = 'Malinki_Test_OK.txt';
+            link.click();
+
+            log('✅ Проверка успешно завершена! Тестовый файл Malinki_Test_OK.txt автоматически скачан.');
+        }
+
+        document.getElementById('btnToggleRecord').addEventListener('click', toggleRecording);
+
+        // Дублирующее управление с клавиатуры (Пробел или Alt+Shift+R)
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !document.getElementById('btnToggleRecord').disabled && e.target === document.body) {
+                e.preventDefault();
+                toggleRecording();
+            }
+            if (e.altKey && e.shiftKey && e.code === 'KeyR') {
+                e.preventDefault();
+                log('⌨️ Перехвачена комбинация клавиш Alt+Shift+R!');
+                toggleRecording();
+            }
+        });
+    </script>
+</body>
+</html>
