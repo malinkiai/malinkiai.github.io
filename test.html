@@ -3,70 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Малинки AI — Тестовый полигон</title>
+    <title>Малинки AI — Автоматический режим</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-indigo-950 text-white min-h-screen p-6 font-sans">
 
-    <div class="max-w-4xl mx-auto space-y-6">
+    <div class="max-w-3xl mx-auto space-y-6">
+        <!-- Шапка -->
         <div class="flex items-center justify-between border-b border-indigo-800 pb-4">
             <div>
-                <h1 class="text-2xl font-bold text-rose-500">Малинки AI — Инженерный полигон</h1>
-                <p class="text-sm text-indigo-300">Прямое сохранение на флешку без лишних запросов браузера</p>
+                <h1 class="text-2xl font-bold text-rose-500">Малинки AI</h1>
+                <p class="text-sm text-indigo-300">Управление одной кнопкой с устройства</p>
             </div>
-            <div id="statusBadge" class="px-4 py-2 rounded-full bg-indigo-900 border border-indigo-700 text-sm font-semibold">
-                ⚪ Ожидание проверки
-            </div>
-        </div>
-
-        <div class="grid md:grid-cols-2 gap-6">
-            <!-- Шаг 1: Плата -->
-            <div class="bg-indigo-900/60 border border-indigo-800 rounded-2xl p-5 space-y-4">
-                <div class="flex items-center justify-between">
-                    <h2 class="text-lg font-bold">1. Плата RP2040-Zero</h2>
-                    <span id="serialStatus" class="text-xs px-2.5 py-1 rounded bg-indigo-800 text-indigo-300">Не подключена</span>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                    <button id="btnConnectSerial" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 rounded-xl text-sm font-semibold transition">
-                        🔌 Подключить плату
-                    </button>
-                    <button id="btnLedRed" disabled class="px-3 py-2 bg-indigo-800 hover:bg-indigo-700 disabled:opacity-40 rounded-xl text-xs">🔴 Красный</button>
-                    <button id="btnLedGreen" disabled class="px-3 py-2 bg-indigo-800 hover:bg-indigo-700 disabled:opacity-40 rounded-xl text-xs">🟢 Зеленый</button>
-                </div>
-            </div>
-
-            <!-- Шаг 2: Флешка, Экран и Микрофон -->
-            <div class="bg-indigo-900/60 border border-indigo-800 rounded-2xl p-5 space-y-4">
-                <div class="flex items-center justify-between">
-                    <h2 class="text-lg font-bold">2. Подготовка к урокам</h2>
-                    <span id="mediaStatus" class="text-xs px-2.5 py-1 rounded bg-indigo-800 text-indigo-300">Не настроено</span>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                    <button id="btnSelectFolder" class="px-3 py-2 bg-indigo-700 hover:bg-indigo-600 rounded-xl text-xs font-semibold transition">
-                        📁 1. Выбрать папку (Флешку)
-                    </button>
-                    <button id="btnInitMedia" class="px-3 py-2 bg-rose-600 hover:bg-rose-500 rounded-xl text-xs font-semibold transition">
-                        🖥️ 2. Дать доступ к экрану
-                    </button>
-                    <button id="btnToggleRecord" disabled class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 rounded-xl text-xs font-semibold transition">
-                        ▶️ Старт (или BOOT)
-                    </button>
-                </div>
-                <div class="space-y-1">
-                    <p id="folderName" class="text-xs text-amber-300">📁 Папка не выбрана (сохранение в Загрузки)</p>
-                    <p id="micName" class="text-xs text-indigo-300">🎤 Микрофон не проверен</p>
-                </div>
+            <div id="statusBadge" class="px-5 py-2.5 rounded-full bg-indigo-900 border border-indigo-700 text-sm font-bold">
+                ⚪ Нажмите «Подготовить систему»
             </div>
         </div>
 
+        <!-- Главная панель: ВСЕГО ОДНА КНОПКА ДЛЯ УЧИТЕЛЯ -->
+        <div class="bg-indigo-900/60 border border-indigo-800 rounded-2xl p-6 text-center space-y-4">
+            <button id="btnOneClickSetup" class="w-full py-4 bg-rose-600 hover:bg-rose-500 rounded-2xl text-lg font-bold shadow-lg transition">
+                🚀 1 КЛИК: Подготовить систему к урокам
+            </button>
+            
+            <div class="grid grid-cols-3 gap-2 text-xs pt-2">
+                <div id="serialStatus" class="p-2 rounded-lg bg-indigo-950 text-indigo-300">🔌 Плата: поиск...</div>
+                <div id="folderStatus" class="p-2 rounded-lg bg-indigo-950 text-indigo-300">📁 Флешка: не выбрана</div>
+                <div id="mediaStatus" class="p-2 rounded-lg bg-indigo-950 text-indigo-300">🖥️ Экран: нет доступа</div>
+            </div>
+
+            <div class="flex justify-center gap-3 pt-1">
+                <button id="btnChangeFolder" class="text-xs text-indigo-400 hover:text-white underline">Сменить папку флешки</button>
+                <button id="btnManualSerial" class="text-xs text-indigo-400 hover:text-white underline">Выбрать плату вручную</button>
+            </div>
+        </div>
+
+        <!-- Результаты и слайды -->
         <div class="grid md:grid-cols-2 gap-6">
             <div class="bg-indigo-900/40 border border-indigo-800 rounded-2xl p-5 space-y-3">
                 <div class="flex justify-between items-center">
-                    <h3 class="text-sm font-semibold text-indigo-200">Сохраненные уроки:</h3>
-                    <span id="lessonCounterUI" class="text-xs text-rose-400 font-bold">Записано: 0</span>
+                    <h3 class="text-sm font-semibold text-indigo-200">Сохраненные на флешку уроки:</h3>
+                    <span id="lessonCounterUI" class="text-xs text-rose-400 font-bold">0 шт.</span>
                 </div>
                 <div id="downloadsList" class="space-y-2 max-h-40 overflow-y-auto text-xs">
-                    <p class="text-indigo-400">Здесь появятся файлы после остановки записи...</p>
+                    <p class="text-indigo-400">После нажатия кнопки BOOT файлы появятся здесь и на флешке...</p>
                 </div>
             </div>
 
@@ -80,9 +60,10 @@
             </div>
         </div>
 
+        <!-- Лог -->
         <div class="bg-black/50 border border-indigo-800 rounded-2xl p-4">
-            <div id="logBox" class="font-mono text-xs text-emerald-400 space-y-1 max-h-44 overflow-y-auto">
-                <div>[Система] Полигон загружен.</div>
+            <div id="logBox" class="font-mono text-xs text-emerald-400 space-y-1 max-h-36 overflow-y-auto">
+                <div>[Система] Готова к автоподключению.</div>
             </div>
         </div>
     </div>
@@ -97,17 +78,42 @@
             box.scrollTop = box.scrollHeight;
         }
 
-        // --- 1. ПОДКЛЮЧЕНИЕ И АВТОПОДКЛЮЧЕНИЕ ПЛАТЫ ---
-        let port = null, writer = null;
+        // --- БАЗА ДАННЫХ БРАУЗЕРА (ЧТОБЫ ПОМНИТЬ ФЛЕШКУ И НЕ СПРАШИВАТЬ ЗАНОВО) ---
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open('MalinkiDB', 1);
+                req.onupgradeneeded = e => e.target.result.createObjectStore('settings');
+                req.onsuccess = e => resolve(e.target.result);
+                req.onerror = e => reject(e);
+            });
+        }
+        async function saveFolderToDB(handle) {
+            const db = await openDB();
+            const tx = db.transaction('settings', 'readwrite');
+            tx.objectStore('settings').put(handle, 'usbFolder');
+        }
+        async function loadFolderFromDB() {
+            const db = await openDB();
+            return new Promise(resolve => {
+                const tx = db.transaction('settings', 'readonly');
+                const req = tx.objectStore('settings').get('usbFolder');
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = () => resolve(null);
+            });
+        }
 
-        async function openSerialPort(selectedPort) {
+        // --- 1. АВТОПОДКЛЮЧЕНИЕ ПЛАТЫ ---
+        let port = null, writer = null, isReadingSerial = false;
+
+        async function connectSerial(selectedPort) {
+            if (isReadingSerial) return;
             try {
                 port = selectedPort;
                 await port.open({ baudRate: 115200 });
-                document.getElementById('serialStatus').textContent = 'Подключена ✅';
-                document.getElementById('serialStatus').className = 'text-xs px-2.5 py-1 rounded bg-emerald-900 text-emerald-300';
-                document.getElementById('btnLedRed').disabled = false;
-                document.getElementById('btnLedGreen').disabled = false;
+                isReadingSerial = true;
+
+                document.getElementById('serialStatus').textContent = '🔌 Плата: Подключена ✅';
+                document.getElementById('serialStatus').className = 'p-2 rounded-lg bg-emerald-900/60 text-emerald-300 font-semibold';
                 log('Плата RP2040 подключена!');
 
                 const textEncoder = new TextEncoderStream();
@@ -126,36 +132,17 @@
                         buffer += value;
                         if (buffer.includes('CLICK')) {
                             buffer = "";
-                            log('🔘 Сигнал CLICK от кнопки BOOT!');
+                            log('🔘 Нажата физическая кнопка BOOT!');
                             toggleRecording();
                         }
-                        if (buffer.length > 40) buffer = "";
+                        if (buffer.length > 50) buffer = "";
                     }
                 }
             } catch (err) {
-                log('Ошибка USB: ' + err.message, true);
+                isReadingSerial = false;
+                log('Инфо USB: ' + err.message, true);
             }
         }
-
-        document.getElementById('btnConnectSerial').addEventListener('click', async () => {
-            try {
-                const selectedPort = await navigator.serial.requestPort();
-                await openSerialPort(selectedPort);
-            } catch (err) {
-                log('Выбор платы отменен.', true);
-            }
-        });
-
-        // Попытка автоподключения при загрузке страницы
-        window.addEventListener('DOMContentLoaded', async () => {
-            if ('serial' in navigator) {
-                const ports = await navigator.serial.getPorts();
-                if (ports.length > 0) {
-                    log('Найдена знакомая плата, подключаемся автоматически...');
-                    openSerialPort(ports[0]);
-                }
-            }
-        });
 
         async function sendLedCommand(cmd) {
             if (writer) {
@@ -163,31 +150,25 @@
             }
         }
 
-        document.getElementById('btnLedRed').addEventListener('click', () => sendLedCommand('RED'));
-        document.getElementById('btnLedGreen').addEventListener('click', () => sendLedCommand('GREEN'));
-
-        // --- 2. ВЫБОР ПАПКИ ФЛЕШКИ (FILE SYSTEM ACCESS API) ---
+        // --- 2. ПАМЯТЬ ФЛЕШКИ И ЗАПУСК В 1 КЛИК ---
         let directoryHandle = null;
-
-        document.getElementById('btnSelectFolder').addEventListener('click', async () => {
-            if (!('showDirectoryPicker' in window)) {
-                log('Ваш браузер не поддерживает прямой выбор папки, файлы будут идти в Загрузки.', true);
-                return;
-            }
-            try {
-                directoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-                document.getElementById('folderName').textContent = `📁 Сохраняем напрямую в: ${directoryHandle.name}`;
-                document.getElementById('folderName').className = 'text-xs text-emerald-400 font-semibold';
-                log(`✅ Выбрана папка "${directoryHandle.name}". Запросы на скачивание отключены!`);
-            } catch (err) {
-                log('Выбор папки отменен: ' + err.message, true);
-            }
-        });
-
-        // --- 3. ДОСТУП К ЭКРАНУ И МИКРОФОНУ ---
         let audioStream = null, screenStream = null, mediaRecorder = null;
         let audioChunks = [], isRecording = false, slideInterval = null, slidesCaptured = 0;
         let lessonCount = 0, lastToggleTime = 0;
+
+        // При открытии сайта сразу проверяем знакомую плату и знакомую флешку
+        window.addEventListener('DOMContentLoaded', async () => {
+            if ('serial' in navigator) {
+                const ports = await navigator.serial.getPorts();
+                if (ports.length > 0) connectSerial(ports[0]);
+            }
+            const savedFolder = await loadFolderFromDB();
+            if (savedFolder) {
+                directoryHandle = savedFolder;
+                document.getElementById('folderStatus').textContent = `📁 Флешка: ${savedFolder.name} (в памяти)`;
+                document.getElementById('folderStatus').className = 'p-2 rounded-lg bg-amber-900/60 text-amber-300';
+            }
+        });
 
         function createSilentAudioStream() {
             const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -201,16 +182,43 @@
             return dest.stream;
         }
 
-        document.getElementById('btnInitMedia').addEventListener('click', async () => {
+        // ГЛАВНАЯ КНОПКА «ПОДГОТОВИТЬ СИСТЕМУ В 1 КЛИК»
+        document.getElementById('btnOneClickSetup').addEventListener('click', async () => {
             try {
+                // 1. Если плата еще не подключена — подключаем
+                if (!isReadingSerial && 'serial' in navigator) {
+                    const ports = await navigator.serial.getPorts();
+                    if (ports.length > 0) {
+                        connectSerial(ports[0]);
+                    } else {
+                        const newPort = await navigator.serial.requestPort();
+                        connectSerial(newPort);
+                    }
+                }
+
+                // 2. Проверяем или запрашиваем папку флешки (если уже есть в памяти — просто подтверждаем доступ)
+                if ('showDirectoryPicker' in window) {
+                    if (directoryHandle) {
+                        const perm = await directoryHandle.requestPermission({ mode: 'readwrite' });
+                        if (perm !== 'granted') {
+                            directoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                            await saveFolderToDB(directoryHandle);
+                        }
+                    } else {
+                        log('Выберите вашу флешку один раз — браузер запомнит её!');
+                        directoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                        await saveFolderToDB(directoryHandle);
+                    }
+                    document.getElementById('folderStatus').textContent = `📁 Флешка: ${directoryHandle.name} ✅`;
+                    document.getElementById('folderStatus').className = 'p-2 rounded-lg bg-emerald-900/60 text-emerald-300 font-semibold';
+                }
+
+                // 3. Микрофон (или авто-заглушка) + Экран
                 try {
                     audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    const trackName = audioStream.getAudioTracks()[0].label || 'Микрофон по умолчанию';
-                    document.getElementById('micName').textContent = '🎤 Активен: ' + trackName;
-                } catch (micErr) {
+                } catch (e) {
                     audioStream = createSilentAudioStream();
-                    document.getElementById('micName').textContent = '🔇 Режим без микрофона (заглушка)';
-                    log('Микрофон не найден, включена аудио-заглушка.', true);
+                    log('Микрофон не найден, включена бесшумная заглушка.');
                 }
 
                 screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
@@ -218,23 +226,39 @@
                 video.srcObject = screenStream;
                 await video.play();
 
-                document.getElementById('mediaStatus').textContent = 'Готово ✅';
-                document.getElementById('mediaStatus').className = 'text-xs px-2.5 py-1 rounded bg-emerald-900 text-emerald-300';
-                document.getElementById('btnToggleRecord').disabled = false;
-                log('✅ Всё готово! Нажимайте кнопку BOOT на плате для старта уроков.');
+                document.getElementById('mediaStatus').textContent = '🖥️ Экран: Готов ✅';
+                document.getElementById('mediaStatus').className = 'p-2 rounded-lg bg-emerald-900/60 text-emerald-300 font-semibold';
+                
+                document.getElementById('btnOneClickSetup').textContent = '✅ СИСТЕМА ГОТОВА — УПРАВЛЯЙТЕ КНОПКОЙ НА ПЛАТЕ';
+                document.getElementById('btnOneClickSetup').className = 'w-full py-4 bg-emerald-700 rounded-2xl text-lg font-bold shadow-lg';
+                document.getElementById('statusBadge').textContent = '🟢 Ожидание нажатия кнопки BOOT';
+                
+                sendLedCommand('BLUE');
+                log('🎉 Всё готово! Сворачивайте браузер и нажимайте кнопку BOOT на плате для старта и остановки уроков.');
             } catch (err) {
-                log('Ошибка доступа к экрану: ' + err.message, true);
+                log('Настройка прервана: ' + err.message, true);
             }
         });
 
-        // --- 4. ЦИКЛИЧНАЯ ЗАПИСЬ И ПРЯМОЕ СОХРАНЕНИЕ ---
+        // Дополнительные ручные кнопки на случай смены флешки/платы
+        document.getElementById('btnChangeFolder').addEventListener('click', async () => {
+            directoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+            await saveFolderToDB(directoryHandle);
+            document.getElementById('folderStatus').textContent = `📁 Флешка: ${directoryHandle.name} ✅`;
+        });
+        document.getElementById('btnManualSerial').addEventListener('click', async () => {
+            const newPort = await navigator.serial.requestPort();
+            connectSerial(newPort);
+        });
+
+        // --- 3. ЦИКЛИЧНЫЙ СТАРТ / СТОП ПО КНОПКЕ BOOT ---
         function toggleRecording() {
             const now = Date.now();
             if (now - lastToggleTime < 1000) return;
             lastToggleTime = now;
 
             if (!audioStream || !screenStream) {
-                log('Сначала нажмите "2. Дать доступ к экрану"!', true);
+                log('Сначала нажмите большую кнопку "Подготовить систему"!', true);
                 return;
             }
             if (!isRecording) startRecording();
@@ -258,12 +282,11 @@
             captureSlide();
             slideInterval = setInterval(captureSlide, 5000);
 
-            document.getElementById('statusBadge').textContent = `🔴 ЗАПИСЬ УРОКА #${lessonCount + 1}`;
-            document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-rose-600 text-white text-sm font-bold animate-pulse';
-            document.getElementById('btnToggleRecord').textContent = '⏹️ Стоп';
+            document.getElementById('statusBadge').textContent = `🔴 ИДЕТ ЗАПИСЬ УРОКА #${lessonCount + 1}`;
+            document.getElementById('statusBadge').className = 'px-5 py-2.5 rounded-full bg-rose-600 text-white text-sm font-bold animate-pulse';
             
             sendLedCommand('RED');
-            log(`▶️ УРОК #${lessonCount + 1}: Запись началась!`);
+            log(`▶️ УРОК #${lessonCount + 1}: Запись началась! (Диод КРАСНЫЙ)`);
         }
 
         function stopRecording() {
@@ -274,12 +297,11 @@
                 mediaRecorder.stop();
             }
 
-            document.getElementById('statusBadge').textContent = '🟢 Готов к новому уроку';
-            document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-emerald-700 text-white text-sm font-semibold';
-            document.getElementById('btnToggleRecord').textContent = '▶️ Старт (или BOOT)';
+            document.getElementById('statusBadge').textContent = '🟢 Урок сохранен (Готов к следующему)';
+            document.getElementById('statusBadge').className = 'px-5 py-2.5 rounded-full bg-emerald-700 text-white text-sm font-bold';
 
             sendLedCommand('GREEN');
-            log('⏹️ Запись остановлена. Записываем файл...');
+            log('⏹️ Запись остановлена! Сохраняем на флешку... (Диод ЗЕЛЕНЫЙ)');
         }
 
         function captureSlide() {
@@ -302,58 +324,31 @@
 
         async function saveResults() {
             lessonCount++;
-            document.getElementById('lessonCounterUI').textContent = `Записано: ${lessonCount}`;
+            document.getElementById('lessonCounterUI').textContent = `${lessonCount} шт.`;
 
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
             const audioUrl = URL.createObjectURL(audioBlob);
             const fileName = `Урок_${lessonCount}_Малинки.webm`;
 
-            // Если выбрана папка флешки — пишем напрямую без вопросов браузера
             if (directoryHandle) {
                 try {
                     const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
                     const writable = await fileHandle.createWritable();
                     await writable.write(audioBlob);
                     await writable.close();
-                    log(`💾 Файл "${fileName}" напрямую записан в папку "${directoryHandle.name}"!`);
+                    log(`💾 УСПЕХ: "${fileName}" сразу записан на флешку (${directoryHandle.name})!`);
                 } catch (err) {
-                    log('Ошибка прямой записи на флешку: ' + err.message, true);
+                    log('Ошибка записи на флешку: ' + err.message, true);
                 }
-            } else {
-                // Запасной вариант — обычное скачивание
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = audioUrl;
-                a.download = fileName;
-                document.body.appendChild(a);
-                a.click();
-                setTimeout(() => document.body.removeChild(a), 1000);
-                log(`💾 Файл "${fileName}" скачан в Загрузки.`);
             }
 
-            // Карточка в интерфейсе
             const list = document.getElementById('downloadsList');
             if (lessonCount === 1) list.innerHTML = '';
             const item = document.createElement('div');
-            item.className = 'p-2 bg-indigo-950 border border-indigo-700 rounded-lg space-y-2';
-            item.innerHTML = `
-                <div class="flex justify-between items-center">
-                    <span class="font-bold text-emerald-400">✅ ${fileName} (Слайдов: ${slidesCaptured})</span>
-                    <a href="${audioUrl}" download="${fileName}" class="px-2 py-1 bg-rose-600 hover:bg-rose-500 rounded text-white font-semibold">Скачать копию</a>
-                </div>
-                <audio src="${audioUrl}" controls class="w-full h-8"></audio>
-            `;
+            item.className = 'p-2 bg-indigo-950 border border-indigo-700 rounded-lg flex justify-between items-center';
+            item.innerHTML = `<span class="font-bold text-emerald-400">✅ ${fileName} (Слайдов: ${slidesCaptured})</span>`;
             list.prepend(item);
         }
-
-        document.getElementById('btnToggleRecord').addEventListener('click', toggleRecording);
-
-        window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space' && !document.getElementById('btnToggleRecord').disabled && e.target === document.body) {
-                e.preventDefault();
-                toggleRecording();
-            }
-        });
     </script>
 </body>
 </html>
