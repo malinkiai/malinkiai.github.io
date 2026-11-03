@@ -12,7 +12,7 @@
         <div class="flex items-center justify-between border-b border-indigo-800 pb-4">
             <div>
                 <h1 class="text-2xl font-bold text-rose-500">Малинки AI — Инженерный полигон</h1>
-                <p class="text-sm text-indigo-300">Цикличная запись уроков (работает даже без микрофона)</p>
+                <p class="text-sm text-indigo-300">Прямое сохранение на флешку без лишних запросов браузера</p>
             </div>
             <div id="statusBadge" class="px-4 py-2 rounded-full bg-indigo-900 border border-indigo-700 text-sm font-semibold">
                 ⚪ Ожидание проверки
@@ -20,9 +20,10 @@
         </div>
 
         <div class="grid md:grid-cols-2 gap-6">
+            <!-- Шаг 1: Плата -->
             <div class="bg-indigo-900/60 border border-indigo-800 rounded-2xl p-5 space-y-4">
                 <div class="flex items-center justify-between">
-                    <h2 class="text-lg font-bold">1. Плата RP2040-Zero (USB)</h2>
+                    <h2 class="text-lg font-bold">1. Плата RP2040-Zero</h2>
                     <span id="serialStatus" class="text-xs px-2.5 py-1 rounded bg-indigo-800 text-indigo-300">Не подключена</span>
                 </div>
                 <div class="flex flex-wrap gap-2">
@@ -34,20 +35,27 @@
                 </div>
             </div>
 
+            <!-- Шаг 2: Флешка, Экран и Микрофон -->
             <div class="bg-indigo-900/60 border border-indigo-800 rounded-2xl p-5 space-y-4">
                 <div class="flex items-center justify-between">
-                    <h2 class="text-lg font-bold">2. Доступ к доске и микрофону</h2>
-                    <span id="mediaStatus" class="text-xs px-2.5 py-1 rounded bg-indigo-800 text-indigo-300">Нет доступа</span>
+                    <h2 class="text-lg font-bold">2. Подготовка к урокам</h2>
+                    <span id="mediaStatus" class="text-xs px-2.5 py-1 rounded bg-indigo-800 text-indigo-300">Не настроено</span>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <button id="btnInitMedia" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 rounded-xl text-sm font-semibold transition">
-                        🖥️ Дать доступ к экрану и звуку
+                    <button id="btnSelectFolder" class="px-3 py-2 bg-indigo-700 hover:bg-indigo-600 rounded-xl text-xs font-semibold transition">
+                        📁 1. Выбрать папку (Флешку)
                     </button>
-                    <button id="btnToggleRecord" disabled class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 rounded-xl text-sm font-semibold transition">
-                        ▶️ Старт записи (или Пробел)
+                    <button id="btnInitMedia" class="px-3 py-2 bg-rose-600 hover:bg-rose-500 rounded-xl text-xs font-semibold transition">
+                        🖥️ 2. Дать доступ к экрану
+                    </button>
+                    <button id="btnToggleRecord" disabled class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 rounded-xl text-xs font-semibold transition">
+                        ▶️ Старт (или BOOT)
                     </button>
                 </div>
-                <p id="micName" class="text-xs text-indigo-300">Микрофон не проверен</p>
+                <div class="space-y-1">
+                    <p id="folderName" class="text-xs text-amber-300">📁 Папка не выбрана (сохранение в Загрузки)</p>
+                    <p id="micName" class="text-xs text-indigo-300">🎤 Микрофон не проверен</p>
+                </div>
             </div>
         </div>
 
@@ -89,18 +97,18 @@
             box.scrollTop = box.scrollHeight;
         }
 
-        // --- 1. ПОДКЛЮЧЕНИЕ ПЛАТЫ ---
+        // --- 1. ПОДКЛЮЧЕНИЕ И АВТОПОДКЛЮЧЕНИЕ ПЛАТЫ ---
         let port = null, writer = null;
 
-        document.getElementById('btnConnectSerial').addEventListener('click', async () => {
+        async function openSerialPort(selectedPort) {
             try {
-                port = await navigator.serial.requestPort();
+                port = selectedPort;
                 await port.open({ baudRate: 115200 });
                 document.getElementById('serialStatus').textContent = 'Подключена ✅';
                 document.getElementById('serialStatus').className = 'text-xs px-2.5 py-1 rounded bg-emerald-900 text-emerald-300';
                 document.getElementById('btnLedRed').disabled = false;
                 document.getElementById('btnLedGreen').disabled = false;
-                log('Плата RP2040 успешно подключена!');
+                log('Плата RP2040 подключена!');
 
                 const textEncoder = new TextEncoderStream();
                 textEncoder.readable.pipeTo(port.writable);
@@ -117,7 +125,7 @@
                     if (value) {
                         buffer += value;
                         if (buffer.includes('CLICK')) {
-                            buffer = ""; // Сразу очищаем буфер
+                            buffer = "";
                             log('🔘 Сигнал CLICK от кнопки BOOT!');
                             toggleRecording();
                         }
@@ -126,6 +134,26 @@
                 }
             } catch (err) {
                 log('Ошибка USB: ' + err.message, true);
+            }
+        }
+
+        document.getElementById('btnConnectSerial').addEventListener('click', async () => {
+            try {
+                const selectedPort = await navigator.serial.requestPort();
+                await openSerialPort(selectedPort);
+            } catch (err) {
+                log('Выбор платы отменен.', true);
+            }
+        });
+
+        // Попытка автоподключения при загрузке страницы
+        window.addEventListener('DOMContentLoaded', async () => {
+            if ('serial' in navigator) {
+                const ports = await navigator.serial.getPorts();
+                if (ports.length > 0) {
+                    log('Найдена знакомая плата, подключаемся автоматически...');
+                    openSerialPort(ports[0]);
+                }
             }
         });
 
@@ -138,17 +166,34 @@
         document.getElementById('btnLedRed').addEventListener('click', () => sendLedCommand('RED'));
         document.getElementById('btnLedGreen').addEventListener('click', () => sendLedCommand('GREEN'));
 
-        // --- 2. ДОСТУП К ЭКРАНУ И МИКРОФОНУ (С АКТИВНОЙ ЗАГЛУШКОЙ) ---
+        // --- 2. ВЫБОР ПАПКИ ФЛЕШКИ (FILE SYSTEM ACCESS API) ---
+        let directoryHandle = null;
+
+        document.getElementById('btnSelectFolder').addEventListener('click', async () => {
+            if (!('showDirectoryPicker' in window)) {
+                log('Ваш браузер не поддерживает прямой выбор папки, файлы будут идти в Загрузки.', true);
+                return;
+            }
+            try {
+                directoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                document.getElementById('folderName').textContent = `📁 Сохраняем напрямую в: ${directoryHandle.name}`;
+                document.getElementById('folderName').className = 'text-xs text-emerald-400 font-semibold';
+                log(`✅ Выбрана папка "${directoryHandle.name}". Запросы на скачивание отключены!`);
+            } catch (err) {
+                log('Выбор папки отменен: ' + err.message, true);
+            }
+        });
+
+        // --- 3. ДОСТУП К ЭКРАНУ И МИКРОФОНУ ---
         let audioStream = null, screenStream = null, mediaRecorder = null;
         let audioChunks = [], isRecording = false, slideInterval = null, slidesCaptured = 0;
         let lessonCount = 0, lastToggleTime = 0;
 
-        // Создание неслышимого аудиопотока, если микрофона нет (чтобы MediaRecorder генерировал реальные байты)
         function createSilentAudioStream() {
             const ctx = new (window.AudioContext || window.webkitAudioContext)();
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
-            gain.gain.value = 0.001; // Почти полная тишина, но поток живой
+            gain.gain.value = 0.001;
             const dest = ctx.createMediaStreamDestination();
             osc.connect(gain);
             gain.connect(dest);
@@ -162,14 +207,12 @@
                     audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     const trackName = audioStream.getAudioTracks()[0].label || 'Микрофон по умолчанию';
                     document.getElementById('micName').textContent = '🎤 Активен: ' + trackName;
-                    log('Микрофон подключен: ' + trackName);
                 } catch (micErr) {
                     audioStream = createSilentAudioStream();
-                    document.getElementById('micName').textContent = '🔇 Режим без микрофона (активна аудио-заглушка)';
-                    log('Микрофон не найден! Включен генератор тишины для теста записи.', true);
+                    document.getElementById('micName').textContent = '🔇 Режим без микрофона (заглушка)';
+                    log('Микрофон не найден, включена аудио-заглушка.', true);
                 }
 
-                log('Выберите "Весь экран" в окне браузера...');
                 screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
                 const video = document.getElementById('screenVideo');
                 video.srcObject = screenStream;
@@ -178,21 +221,20 @@
                 document.getElementById('mediaStatus').textContent = 'Готово ✅';
                 document.getElementById('mediaStatus').className = 'text-xs px-2.5 py-1 rounded bg-emerald-900 text-emerald-300';
                 document.getElementById('btnToggleRecord').disabled = false;
-                log('✅ Доступ получен! Нажимайте кнопку BOOT на плате для старта и остановки.');
+                log('✅ Всё готово! Нажимайте кнопку BOOT на плате для старта уроков.');
             } catch (err) {
                 log('Ошибка доступа к экрану: ' + err.message, true);
             }
         });
 
-        // --- 3. ЦИКЛИЧНАЯ ЗАПИСЬ УРОКОВ ---
+        // --- 4. ЦИКЛИЧНАЯ ЗАПИСЬ И ПРЯМОЕ СОХРАНЕНИЕ ---
         function toggleRecording() {
-            // Защита от двойного клика (не чаще 1 раза в секунду)
             const now = Date.now();
             if (now - lastToggleTime < 1000) return;
             lastToggleTime = now;
 
             if (!audioStream || !screenStream) {
-                log('Сначала нажмите кнопку "2. Дать доступ к экрану и звуку"!', true);
+                log('Сначала нажмите "2. Дать доступ к экрану"!', true);
                 return;
             }
             if (!isRecording) startRecording();
@@ -211,8 +253,6 @@
                 if (e.data && e.data.size > 0) audioChunks.push(e.data);
             };
             mediaRecorder.onstop = saveResults;
-            
-            // Запрашиваем данные каждую секунду (1000 мс), чтобы массив гарантированно наполнялся
             mediaRecorder.start(1000);
 
             captureSlide();
@@ -220,11 +260,10 @@
 
             document.getElementById('statusBadge').textContent = `🔴 ЗАПИСЬ УРОКА #${lessonCount + 1}`;
             document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-rose-600 text-white text-sm font-bold animate-pulse';
-            document.getElementById('btnToggleRecord').textContent = '⏹️ Остановить запись';
-            document.getElementById('btnToggleRecord').className = 'px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-xl text-sm font-semibold transition';
+            document.getElementById('btnToggleRecord').textContent = '⏹️ Стоп';
             
             sendLedCommand('RED');
-            log(`▶️ УРОК #${lessonCount + 1}: Запись пошла!`);
+            log(`▶️ УРОК #${lessonCount + 1}: Запись началась!`);
         }
 
         function stopRecording() {
@@ -237,11 +276,10 @@
 
             document.getElementById('statusBadge').textContent = '🟢 Готов к новому уроку';
             document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-emerald-700 text-white text-sm font-semibold';
-            document.getElementById('btnToggleRecord').textContent = '▶️ Старт записи (или Пробел)';
-            document.getElementById('btnToggleRecord').className = 'px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-sm font-semibold transition';
+            document.getElementById('btnToggleRecord').textContent = '▶️ Старт (или BOOT)';
 
             sendLedCommand('GREEN');
-            log('⏹️ Запись остановлена. Сохраняем файлы...');
+            log('⏹️ Запись остановлена. Записываем файл...');
         }
 
         function captureSlide() {
@@ -262,40 +300,50 @@
             document.getElementById('slidesGallery').appendChild(img);
         }
 
-        function saveResults() {
+        async function saveResults() {
             lessonCount++;
             document.getElementById('lessonCounterUI').textContent = `Записано: ${lessonCount}`;
 
-            // Создаем комбинированный отчет + аудиофайл
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
             const audioUrl = URL.createObjectURL(audioBlob);
             const fileName = `Урок_${lessonCount}_Малинки.webm`;
 
+            // Если выбрана папка флешки — пишем напрямую без вопросов браузера
+            if (directoryHandle) {
+                try {
+                    const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(audioBlob);
+                    await writable.close();
+                    log(`💾 Файл "${fileName}" напрямую записан в папку "${directoryHandle.name}"!`);
+                } catch (err) {
+                    log('Ошибка прямой записи на флешку: ' + err.message, true);
+                }
+            } else {
+                // Запасной вариант — обычное скачивание
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = audioUrl;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => document.body.removeChild(a), 1000);
+                log(`💾 Файл "${fileName}" скачан в Загрузки.`);
+            }
+
+            // Карточка в интерфейсе
             const list = document.getElementById('downloadsList');
             if (lessonCount === 1) list.innerHTML = '';
-
-            // Добавляем карточку урока с плеером и кнопкой ручного скачивания
             const item = document.createElement('div');
             item.className = 'p-2 bg-indigo-950 border border-indigo-700 rounded-lg space-y-2';
             item.innerHTML = `
                 <div class="flex justify-between items-center">
                     <span class="font-bold text-emerald-400">✅ ${fileName} (Слайдов: ${slidesCaptured})</span>
-                    <a href="${audioUrl}" download="${fileName}" class="px-2 py-1 bg-rose-600 hover:bg-rose-500 rounded text-white font-semibold">💾 Скачать</a>
+                    <a href="${audioUrl}" download="${fileName}" class="px-2 py-1 bg-rose-600 hover:bg-rose-500 rounded text-white font-semibold">Скачать копию</a>
                 </div>
                 <audio src="${audioUrl}" controls class="w-full h-8"></audio>
             `;
             list.prepend(item);
-
-            // Автоматическое скачивание через DOM
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = audioUrl;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => document.body.removeChild(a), 1000);
-
-            log(`💾 "${fileName}" сохранен! Нажмите BOOT еще раз, чтобы начать Урок #${lessonCount + 1}.`);
         }
 
         document.getElementById('btnToggleRecord').addEventListener('click', toggleRecording);
