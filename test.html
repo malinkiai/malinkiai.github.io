@@ -12,7 +12,7 @@
         <div class="flex items-center justify-between border-b border-indigo-800 pb-4">
             <div>
                 <h1 class="text-2xl font-bold text-rose-500">Малинки AI — Инженерный полигон</h1>
-                <p class="text-sm text-indigo-300">Проверка школьного ПК: связь с платой, микрофон и захват доски</p>
+                <p class="text-sm text-indigo-300">Цикличная запись уроков (работает даже без микрофона)</p>
             </div>
             <div id="statusBadge" class="px-4 py-2 rounded-full bg-indigo-900 border border-indigo-700 text-sm font-semibold">
                 ⚪ Ожидание проверки
@@ -29,12 +29,8 @@
                     <button id="btnConnectSerial" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 rounded-xl text-sm font-semibold transition">
                         🔌 Подключить плату
                     </button>
-                    <button id="btnLedRed" disabled class="px-3 py-2 bg-indigo-800 hover:bg-indigo-700 disabled:opacity-40 rounded-xl text-xs">
-                        🔴 Тест: Красный
-                    </button>
-                    <button id="btnLedGreen" disabled class="px-3 py-2 bg-indigo-800 hover:bg-indigo-700 disabled:opacity-40 rounded-xl text-xs">
-                        🟢 Тест: Зеленый
-                    </button>
+                    <button id="btnLedRed" disabled class="px-3 py-2 bg-indigo-800 hover:bg-indigo-700 disabled:opacity-40 rounded-xl text-xs">🔴 Красный</button>
+                    <button id="btnLedGreen" disabled class="px-3 py-2 bg-indigo-800 hover:bg-indigo-700 disabled:opacity-40 rounded-xl text-xs">🟢 Зеленый</button>
                 </div>
             </div>
 
@@ -51,31 +47,28 @@
                         ▶️ Старт записи (или Пробел)
                     </button>
                 </div>
+                <p id="micName" class="text-xs text-indigo-300">Микрофон не проверен</p>
             </div>
         </div>
 
         <div class="grid md:grid-cols-2 gap-6">
             <div class="bg-indigo-900/40 border border-indigo-800 rounded-2xl p-5 space-y-3">
-                <h3 class="text-sm font-semibold text-indigo-200">Уровень сигнала микрофона:</h3>
-                <div class="w-full bg-indigo-950 rounded-full h-4 overflow-hidden border border-indigo-800">
-                    <div id="micLevel" class="bg-rose-500 h-full w-0 transition-all duration-75"></div>
+                <div class="flex justify-between items-center">
+                    <h3 class="text-sm font-semibold text-indigo-200">Сохраненные уроки:</h3>
+                    <span id="lessonCounterUI" class="text-xs text-rose-400 font-bold">Записано: 0</span>
                 </div>
-                <p id="micName" class="text-xs text-indigo-400">Микрофон не выбран</p>
-                <div id="audioResultBox" class="hidden pt-3 border-t border-indigo-800 space-y-2">
-                    <p class="text-xs text-emerald-400 font-semibold">✅ Записанное аудио урока:</p>
-                    <audio id="recordedAudio" controls class="w-full h-10"></audio>
+                <div id="downloadsList" class="space-y-2 max-h-40 overflow-y-auto text-xs">
+                    <p class="text-indigo-400">Здесь появятся файлы после остановки записи...</p>
                 </div>
             </div>
 
             <div class="bg-indigo-900/40 border border-indigo-800 rounded-2xl p-5 space-y-3">
                 <div class="flex justify-between items-center">
-                    <h3 class="text-sm font-semibold text-indigo-200">Захваченные слайды (каждые 5 сек):</h3>
+                    <h3 class="text-sm font-semibold text-indigo-200">Слайды текущего урока:</h3>
                     <span id="slideCount" class="text-xs text-rose-400 font-bold">0 шт.</span>
                 </div>
-                <video id="screenVideo" autoplay muted class="hidden"></video>
-                <div id="slidesGallery" class="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto p-1">
-                    <p class="text-xs text-indigo-400 col-span-3">Скриншоты появятся здесь во время записи...</p>
-                </div>
+                <video id="screenVideo" autoplay muted playsinline class="hidden"></video>
+                <div id="slidesGallery" class="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto p-1"></div>
             </div>
         </div>
 
@@ -91,13 +84,13 @@
             const box = document.getElementById('logBox');
             const div = document.createElement('div');
             div.className = isError ? 'text-rose-400 font-bold' : 'text-emerald-400';
-            div.textContent = msg;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
             box.appendChild(div);
             box.scrollTop = box.scrollHeight;
         }
 
-        let port = null;
-        let writer = null;
+        // --- 1. ПОДКЛЮЧЕНИЕ ПЛАТЫ ---
+        let port = null, writer = null;
 
         document.getElementById('btnConnectSerial').addEventListener('click', async () => {
             try {
@@ -117,67 +110,89 @@
                 port.readable.pipeTo(textDecoder.writable);
                 const reader = textDecoder.readable.getReader();
 
-                let buffer = ""; // Копилка для букв
-                
+                let buffer = "";
                 while (true) {
                     const { value, done } = await reader.read();
                     if (done) break;
                     if (value) {
-                        console.log("USB Сырые данные:", value); // Теперь это будет видно в F12
-                        buffer += value; 
-                        
+                        buffer += value;
                         if (buffer.includes('CLICK')) {
-                            log('🔘 Получен сигнал CLICK от физической кнопки на плате!');
+                            buffer = ""; // Сразу очищаем буфер
+                            log('🔘 Сигнал CLICK от кнопки BOOT!');
                             toggleRecording();
-                            buffer = ""; // Очищаем копилку
                         }
-                        
-                        // Защита от переполнения буфера мусором
-                        if (buffer.length > 50) buffer = ""; 
+                        if (buffer.length > 40) buffer = "";
                     }
                 }
             } catch (err) {
-                log('Ошибка: ' + err.message, true);
+                log('Ошибка USB: ' + err.message, true);
             }
         });
 
         async function sendLedCommand(cmd) {
             if (writer) {
-                await writer.write(cmd + '\n');
+                try { await writer.write(cmd + '\n'); } catch (e) {}
             }
         }
 
         document.getElementById('btnLedRed').addEventListener('click', () => sendLedCommand('RED'));
         document.getElementById('btnLedGreen').addEventListener('click', () => sendLedCommand('GREEN'));
 
+        // --- 2. ДОСТУП К ЭКРАНУ И МИКРОФОНУ (С АКТИВНОЙ ЗАГЛУШКОЙ) ---
         let audioStream = null, screenStream = null, mediaRecorder = null;
         let audioChunks = [], isRecording = false, slideInterval = null, slidesCaptured = 0;
+        let lessonCount = 0, lastToggleTime = 0;
+
+        // Создание неслышимого аудиопотока, если микрофона нет (чтобы MediaRecorder генерировал реальные байты)
+        function createSilentAudioStream() {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            gain.gain.value = 0.001; // Почти полная тишина, но поток живой
+            const dest = ctx.createMediaStreamDestination();
+            osc.connect(gain);
+            gain.connect(dest);
+            osc.start();
+            return dest.stream;
+        }
 
         document.getElementById('btnInitMedia').addEventListener('click', async () => {
-    try {
-        try {
-            audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            document.getElementById('micName').textContent = 'Микрофон подключен';
-        } catch (micErr) {
-            log('Микрофон не найден, включена тихая заглушка для теста доски.', true);
-            const ctx = new AudioContext();
-            const dest = ctx.createMediaStreamDestination();
-            audioStream = dest.stream;
-            document.getElementById('micName').textContent = 'Тест без микрофона (заглушка)';
-        }
-        screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        document.getElementById('screenVideo').srcObject = screenStream;
-        document.getElementById('mediaStatus').textContent = 'Готово ✅';
-        document.getElementById('mediaStatus').className = 'text-xs px-2.5 py-1 rounded bg-emerald-900 text-emerald-300';
-        document.getElementById('btnToggleRecord').disabled = false;
-    } catch (err) {
-        log('Ошибка доступа к экрану: ' + err.message, true);
-    }
-});
+            try {
+                try {
+                    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const trackName = audioStream.getAudioTracks()[0].label || 'Микрофон по умолчанию';
+                    document.getElementById('micName').textContent = '🎤 Активен: ' + trackName;
+                    log('Микрофон подключен: ' + trackName);
+                } catch (micErr) {
+                    audioStream = createSilentAudioStream();
+                    document.getElementById('micName').textContent = '🔇 Режим без микрофона (активна аудио-заглушка)';
+                    log('Микрофон не найден! Включен генератор тишины для теста записи.', true);
+                }
 
+                log('Выберите "Весь экран" в окне браузера...');
+                screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                const video = document.getElementById('screenVideo');
+                video.srcObject = screenStream;
+                await video.play();
+
+                document.getElementById('mediaStatus').textContent = 'Готово ✅';
+                document.getElementById('mediaStatus').className = 'text-xs px-2.5 py-1 rounded bg-emerald-900 text-emerald-300';
+                document.getElementById('btnToggleRecord').disabled = false;
+                log('✅ Доступ получен! Нажимайте кнопку BOOT на плате для старта и остановки.');
+            } catch (err) {
+                log('Ошибка доступа к экрану: ' + err.message, true);
+            }
+        });
+
+        // --- 3. ЦИКЛИЧНАЯ ЗАПИСЬ УРОКОВ ---
         function toggleRecording() {
+            // Защита от двойного клика (не чаще 1 раза в секунду)
+            const now = Date.now();
+            if (now - lastToggleTime < 1000) return;
+            lastToggleTime = now;
+
             if (!audioStream || !screenStream) {
-                log('Сначала дайте доступ к экрану и звуку!', true);
+                log('Сначала нажмите кнопку "2. Дать доступ к экрану и звуку"!', true);
                 return;
             }
             if (!isRecording) startRecording();
@@ -188,43 +203,109 @@
             isRecording = true;
             audioChunks = [];
             slidesCaptured = 0;
-            document.getElementById('audioResultBox').classList.add('hidden');
+            document.getElementById('slideCount').textContent = '0 шт.';
+            document.getElementById('slidesGallery').innerHTML = '';
+
             mediaRecorder = new MediaRecorder(audioStream);
-            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+            mediaRecorder.ondataavailable = e => {
+                if (e.data && e.data.size > 0) audioChunks.push(e.data);
+            };
             mediaRecorder.onstop = saveResults;
-            mediaRecorder.start();
-            slideInterval = setInterval(captureSlide, 5000);
             
-            document.getElementById('statusBadge').textContent = '🔴 ИДЕТ ЗАПИСЬ';
+            // Запрашиваем данные каждую секунду (1000 мс), чтобы массив гарантированно наполнялся
+            mediaRecorder.start(1000);
+
+            captureSlide();
+            slideInterval = setInterval(captureSlide, 5000);
+
+            document.getElementById('statusBadge').textContent = `🔴 ЗАПИСЬ УРОКА #${lessonCount + 1}`;
             document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-rose-600 text-white text-sm font-bold animate-pulse';
+            document.getElementById('btnToggleRecord').textContent = '⏹️ Остановить запись';
+            document.getElementById('btnToggleRecord').className = 'px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-xl text-sm font-semibold transition';
+            
             sendLedCommand('RED');
-            log('▶️ ЗАПИСЬ НАЧАЛАСЬ!');
+            log(`▶️ УРОК #${lessonCount + 1}: Запись пошла!`);
         }
 
         function stopRecording() {
             isRecording = false;
-            mediaRecorder.stop();
             clearInterval(slideInterval);
-            document.getElementById('statusBadge').textContent = '🟢 Сохранено';
+            
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+
+            document.getElementById('statusBadge').textContent = '🟢 Готов к новому уроку';
             document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-emerald-700 text-white text-sm font-semibold';
+            document.getElementById('btnToggleRecord').textContent = '▶️ Старт записи (или Пробел)';
+            document.getElementById('btnToggleRecord').className = 'px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-sm font-semibold transition';
+
             sendLedCommand('GREEN');
-            log('⏹️ ЗАПИСЬ ОСТАНОВЛЕНА.');
+            log('⏹️ Запись остановлена. Сохраняем файлы...');
         }
 
         function captureSlide() {
             const video = document.getElementById('screenVideo');
             if (!video.videoWidth) return;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 320;
+            canvas.height = 180;
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
             slidesCaptured++;
             document.getElementById('slideCount').textContent = slidesCaptured + ' шт.';
+
+            const img = document.createElement('img');
+            img.src = canvas.toDataURL('image/jpeg', 0.6);
+            img.className = 'rounded border border-indigo-600 w-full h-16 object-cover';
+            document.getElementById('slidesGallery').appendChild(img);
         }
 
         function saveResults() {
+            lessonCount++;
+            document.getElementById('lessonCounterUI').textContent = `Записано: ${lessonCount}`;
+
+            // Создаем комбинированный отчет + аудиофайл
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            document.getElementById('recordedAudio').src = URL.createObjectURL(audioBlob);
-            document.getElementById('audioResultBox').classList.remove('hidden');
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const fileName = `Урок_${lessonCount}_Малинки.webm`;
+
+            const list = document.getElementById('downloadsList');
+            if (lessonCount === 1) list.innerHTML = '';
+
+            // Добавляем карточку урока с плеером и кнопкой ручного скачивания
+            const item = document.createElement('div');
+            item.className = 'p-2 bg-indigo-950 border border-indigo-700 rounded-lg space-y-2';
+            item.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <span class="font-bold text-emerald-400">✅ ${fileName} (Слайдов: ${slidesCaptured})</span>
+                    <a href="${audioUrl}" download="${fileName}" class="px-2 py-1 bg-rose-600 hover:bg-rose-500 rounded text-white font-semibold">💾 Скачать</a>
+                </div>
+                <audio src="${audioUrl}" controls class="w-full h-8"></audio>
+            `;
+            list.prepend(item);
+
+            // Автоматическое скачивание через DOM
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = audioUrl;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => document.body.removeChild(a), 1000);
+
+            log(`💾 "${fileName}" сохранен! Нажмите BOOT еще раз, чтобы начать Урок #${lessonCount + 1}.`);
         }
 
         document.getElementById('btnToggleRecord').addEventListener('click', toggleRecording);
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !document.getElementById('btnToggleRecord').disabled && e.target === document.body) {
+                e.preventDefault();
+                toggleRecording();
+            }
+        });
     </script>
 </body>
 </html>
