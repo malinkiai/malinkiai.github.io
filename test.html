@@ -154,16 +154,26 @@
         let audioChunks = [], isRecording = false, slideInterval = null, slidesCaptured = 0;
 
         document.getElementById('btnInitMedia').addEventListener('click', async () => {
-            try {
-                audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                document.getElementById('micName').textContent = 'Микрофон подключен';
-                screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-                document.getElementById('screenVideo').srcObject = screenStream;
-                document.getElementById('mediaStatus').textContent = 'Готово ✅';
-                document.getElementById('mediaStatus').className = 'text-xs px-2.5 py-1 rounded bg-emerald-900 text-emerald-300';
-                document.getElementById('btnToggleRecord').disabled = false;
-            } catch (err) {}
-        });
+    try {
+        try {
+            audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            document.getElementById('micName').textContent = 'Микрофон подключен';
+        } catch (micErr) {
+            log('Микрофон не найден, включена тихая заглушка для теста доски.', true);
+            const ctx = new AudioContext();
+            const dest = ctx.createMediaStreamDestination();
+            audioStream = dest.stream;
+            document.getElementById('micName').textContent = 'Тест без микрофона (заглушка)';
+        }
+        screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        document.getElementById('screenVideo').srcObject = screenStream;
+        document.getElementById('mediaStatus').textContent = 'Готово ✅';
+        document.getElementById('mediaStatus').className = 'text-xs px-2.5 py-1 rounded bg-emerald-900 text-emerald-300';
+        document.getElementById('btnToggleRecord').disabled = false;
+    } catch (err) {
+        log('Ошибка доступа к экрану: ' + err.message, true);
+    }
+});
 
         function toggleRecording() {
             if (!audioStream || !screenStream) {
