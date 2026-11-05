@@ -393,4 +393,84 @@
                 };
 
                 savedLessons.unshift(newLesson);
-                localStorage.setItem('malinki_lessons', JSON.stringify(savedLessons.slice(0, 1
+                localStorage.setItem('malinki_lessons', JSON.stringify(savedLessons.slice(0, 15)));
+                renderAllLessons();
+
+                document.getElementById('statusBadge').textContent = '🔴 Запись не ведется (Конспект готов!)';
+                document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-indigo-900 border border-indigo-700 text-xs font-bold';
+                log(`✨ УСПЕХ! Конспект "${data.title}" готов и опубликован во вкладке "Портал учеников"!`);
+            } catch (err) {
+                document.getElementById('statusBadge').textContent = '⚠️ Ошибка генерации';
+                log('Ошибка ИИ: ' + err.message, true);
+            }
+        }
+
+        // --- 4. ПОРТАЛ УЧЕНИКОВ ---
+        function renderAllLessons() {
+            const feed = document.getElementById('studentFeed');
+            document.getElementById('cloudCount').textContent = savedLessons.length;
+
+            if (savedLessons.length === 0) {
+                feed.innerHTML = '<p class="text-xs text-indigo-400">Запишите первый урок, и ИИ опубликует готовый конспект здесь...</p>';
+                return;
+            }
+
+            feed.innerHTML = '';
+            savedLessons.forEach((item, idx) => {
+                const card = document.createElement('div');
+                card.className = 'p-5 bg-indigo-950 border border-indigo-700 rounded-2xl space-y-4';
+                card.innerHTML = `
+                    <div class="flex flex-wrap justify-between items-start gap-2">
+                        <div>
+                            <span class="text-xs px-2.5 py-1 rounded bg-rose-600 text-white font-bold">${item.subject}</span>
+                            <h3 class="font-bold text-lg mt-2 text-white">${item.title}</h3>
+                            <p class="text-xs text-indigo-400">Опубликовано в ${item.time} • Слайдов: ${item.slides.length}</p>
+                        </div>
+                        <button onclick="downloadWord(${idx})" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold transition shadow">
+                            📄 Скачать Word (.doc)
+                        </button>
+                    </div>
+                    <div class="text-sm text-indigo-100 whitespace-pre-line bg-indigo-900/40 p-4 rounded-xl border border-indigo-800 leading-relaxed">${item.summary}</div>
+                    ${item.slides.length > 0 ? `
+                        <div class="grid grid-cols-3 gap-2 pt-1">
+                            ${item.slides.map(s => `<img src="${s}" class="rounded-lg border border-indigo-700 w-full h-24 object-cover">`).join('')}
+                        </div>
+                    ` : ''}
+                `;
+                feed.appendChild(card);
+            });
+        }
+
+        window.downloadWord = function(index) {
+            const item = savedLessons[index];
+            if (!item) return;
+            const slidesHtml = item.slides.map(s => `<p><img src="${s}" width="450" /></p>`).join('');
+            const htmlContent = `
+                <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+                <head><meta charset="utf-8"><title>${item.title}</title></head>
+                <body style="font-family: Arial, sans-serif; line-height: 1.5;">
+                    <p style="color: #e11d48; font-weight: bold;">${item.subject} • Малинки AI</p>
+                    <h1>${item.title}</h1>
+                    <div style="white-space: pre-line; margin-bottom: 20px;">${item.summary}</div>
+                    <h3>Материалы с экрана:</h3>
+                    ${slidesHtml}
+                </body></html>
+            `;
+            const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Конспект_${item.title.replace(/[^а-яА-Яa-zA-Z0-9]/g, '_')}.doc`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        };
+
+        document.getElementById('btnClearHistory').addEventListener('click', () => {
+            savedLessons = [];
+            localStorage.removeItem('malinki_lessons');
+            renderAllLessons();
+        });
+    </script>
+</body>
+</html>
