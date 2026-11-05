@@ -49,15 +49,21 @@
                     <button id="btnOneClickSetup" class="flex-1 py-4 bg-rose-600 hover:bg-rose-500 rounded-2xl text-lg font-bold shadow-lg transition">
                         🚀 1 КЛИК: Подключить устройство, микрофон и экран
                     </button>
-                    <button id="btnManualRecord" disabled class="px-5 py-4 bg-indigo-800 hover:bg-indigo-700 disabled:opacity-40 rounded-2xl text-sm font-bold transition" title="Запасная кнопка на случай теста без платы">
+                    <button id="btnManualRecord" disabled class="px-5 py-4 bg-indigo-800 hover:bg-indigo-700 disabled:opacity-40 rounded-2xl text-sm font-bold transition">
                         ▶️ Старт / Стоп
                     </button>
                 </div>
 
                 <div class="grid grid-cols-3 gap-2 text-xs">
-                    <div id="serialStatus" class="p-2.5 rounded-lg bg-indigo-950 text-indigo-300 text-center">🔌 Плата: поиск...</div>
+                    <div id="serialStatus" class="p-2.5 rounded-lg bg-indigo-950 text-indigo-300 text-center">🔌 Плата: не подключена</div>
                     <div id="mediaStatus" class="p-2.5 rounded-lg bg-indigo-950 text-indigo-300 text-center">🎤 Микрофон и экран: не активны</div>
-                    <div class="p-2.5 rounded-lg bg-emerald-950/60 text-emerald-300 text-center font-semibold">🤖 Нейросеть Gemini: Подключена</div>
+                    <div class="p-2.5 rounded-lg bg-emerald-950/60 text-emerald-300 text-center font-semibold">🤖 Нейросеть Gemini: Готова</div>
+                </div>
+
+                <div class="flex justify-center">
+                    <button id="btnConnectBoardOnly" class="text-xs text-indigo-400 hover:text-white underline">
+                        🔌 Выбрать плату RP2040 вручную (если не выбралась)
+                    </button>
                 </div>
             </div>
 
@@ -76,7 +82,7 @@
                 <div class="bg-black/50 border border-indigo-800 rounded-2xl p-4">
                     <h3 class="text-xs font-semibold text-indigo-400 mb-2">Системный журнал:</h3>
                     <div id="logBox" class="font-mono text-xs text-emerald-400 space-y-1 max-h-36 overflow-y-auto">
-                        <div>[Система] Готова к работе.</div>
+                        <div>[Система] Готова. Зеленый диод = запись идет, Красный = запись остановлена.</div>
                     </div>
                 </div>
             </div>
@@ -100,7 +106,11 @@
     </div>
 
     <script>
-        // Переключение вкладок
+        // Автоматический выбор адреса сервера Vercel (работает даже при открытии с github.io)
+        const API_URL = window.location.hostname.includes('vercel.app')
+            ? '/api/process'
+            : 'https://malinkiai.vercel.app/api/process';
+
         const tabTeacher = document.getElementById('tabTeacher');
         const tabStudent = document.getElementById('tabStudent');
         const viewTeacher = document.getElementById('viewTeacher');
@@ -132,7 +142,7 @@
             box.scrollTop = box.scrollHeight;
         }
 
-        // --- 1. ПОДКЛЮЧЕНИЕ ПЛАТЫ RP2040-ZERO ---
+        // --- 1. ПОДКЛЮЧЕНИЕ ПЛАТЫ RP2040-ZERO (БЕЗ БЛОКИРОВКИ ПОТОКА) ---
         let port = null, writer = null, isReadingSerial = false;
 
         async function connectSerial(selectedPort) {
@@ -144,12 +154,25 @@
 
                 document.getElementById('serialStatus').textContent = '🔌 Плата: Подключена ✅';
                 document.getElementById('serialStatus').className = 'p-2.5 rounded-lg bg-emerald-900/60 text-emerald-300 font-semibold text-center';
-                log('Плата RP2040-Zero подключена!');
+                log('Плата RP2040-Zero успешно подключена!');
 
                 const textEncoder = new TextEncoderStream();
                 textEncoder.readable.pipeTo(port.writable);
                 writer = textEncoder.writable.getWriter();
 
+                // Сразу зажигаем КРАСНЫЙ (запись пока не ведется)
+                await sendLedCommand('RED');
+
+                // Запускаем фоновое чтение кнопки BOOT (без await, чтобы не вешать сайт!)
+                readSerialLoop();
+            } catch (err) {
+                isReadingSerial = false;
+                log('Ошибка USB-порта (закройте другие вкладки с платой): ' + err.message, true);
+            }
+        }
+
+        async function readSerialLoop() {
+            try {
                 const textDecoder = new TextDecoderStream();
                 port.readable.pipeTo(textDecoder.writable);
                 const reader = textDecoder.readable.getReader();
@@ -162,7 +185,7 @@
                         buffer += value;
                         if (buffer.includes('CLICK')) {
                             buffer = "";
-                            log('🔘 Нажата физическая кнопка на плате!');
+                            log('🔘 Нажата физическая кнопка BOOT на плате!');
                             toggleRecording();
                         }
                         if (buffer.length > 50) buffer = "";
@@ -170,7 +193,7 @@
                 }
             } catch (err) {
                 isReadingSerial = false;
-                log('Инфо USB: ' + err.message, true);
+                log('Связь с платой прервана: ' + err.message, true);
             }
         }
 
@@ -180,7 +203,6 @@
             }
         }
 
-        // Автоподключение платы и загрузка сохраненных конспектов при старте
         let savedLessons = JSON.parse(localStorage.getItem('malinki_lessons') || '[]');
 
         window.addEventListener('DOMContentLoaded', async () => {
@@ -191,6 +213,15 @@
             renderAllLessons();
         });
 
+        document.getElementById('btnConnectBoardOnly').addEventListener('click', async () => {
+            try {
+                const newPort = await navigator.serial.requestPort();
+                await connectSerial(newPort);
+            } catch (e) {
+                log('Выбор платы отменен.', true);
+            }
+        });
+
         // --- 2. ПОДГОТОВКА В 1 КЛИК (ПЛАТА + МИКРОФОН + ЭКРАН) ---
         let audioStream = null, screenStream = null, mediaRecorder = null;
         let audioChunks = [], currentSlides = [], isRecording = false, slideInterval = null;
@@ -198,25 +229,29 @@
 
         document.getElementById('btnOneClickSetup').addEventListener('click', async () => {
             try {
-                // Подключаем плату, если еще не подключена
+                // 1. Подключаем плату (теперь не блокирует дальнейший код!)
                 if (!isReadingSerial && 'serial' in navigator) {
                     try {
                         const ports = await navigator.serial.getPorts();
-                        if (ports.length > 0) await connectSerial(ports[0]);
-                        else await connectSerial(await navigator.serial.requestPort());
+                        if (ports.length > 0) {
+                            await connectSerial(ports[0]);
+                        } else {
+                            const newPort = await navigator.serial.requestPort();
+                            await connectSerial(newPort);
+                        }
                     } catch (e) {
-                        log('Плата не выбрана, можно управлять кнопкой на экране.');
+                        log('Плата не выбрана, можно использовать кнопку на экране.');
                     }
                 }
 
-                // Подключаем новый микрофон с шумоподавлением
+                // 2. Подключаем микрофон
                 audioStream = await navigator.mediaDevices.getUserMedia({
                     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
                 });
                 const micLabel = audioStream.getAudioTracks()[0].label || 'USB Микрофон';
-                log('🎤 Микрофон подключен: ' + micLabel);
+                log('🎤 Микрофон готов: ' + micLabel);
 
-                // Подключаем захват экрана
+                // 3. Подключаем захват экрана
                 screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
                 const video = document.getElementById('screenVideo');
                 video.srcObject = screenStream;
@@ -225,28 +260,29 @@
                 document.getElementById('mediaStatus').textContent = '🎤 Микрофон и экран: Готовы ✅';
                 document.getElementById('mediaStatus').className = 'p-2.5 rounded-lg bg-emerald-900/60 text-emerald-300 font-semibold text-center';
                 
-                document.getElementById('btnOneClickSetup').textContent = '✅ СИСТЕМА АКТИВНА — УПРАВЛЯЙТЕ КНОПКОЙ НА ПЛАТЕ';
+                document.getElementById('btnOneClickSetup').textContent = '✅ СИСТЕМА ГОТОВА — ЖМИТЕ КНОПКУ BOOT НА ПЛАТЕ';
                 document.getElementById('btnOneClickSetup').className = 'flex-1 py-4 bg-emerald-700 rounded-2xl text-lg font-bold shadow-lg';
                 document.getElementById('btnManualRecord').disabled = false;
-                document.getElementById('statusBadge').textContent = '🟢 Ожидание старта урока';
+                document.getElementById('statusBadge').textContent = '🔴 Запись не ведется (Жду нажатия)';
                 
-                sendLedCommand('BLUE');
-                log('🎉 Всё готово! Нажмите кнопку BOOT на плате, чтобы начать запись.');
+                // Запись пока НЕ идет -> горит КРАСНЫЙ
+                sendLedCommand('RED');
+                log('🎉 Система готова! Диод КРАСНЫЙ (запись не идет). Нажмите кнопку BOOT для старта!');
             } catch (err) {
-                log('Ошибка доступа: ' + err.message, true);
+                log('Ошибка при подготовке: ' + err.message, true);
             }
         });
 
         document.getElementById('btnManualRecord').addEventListener('click', toggleRecording);
 
-        // --- 3. ЗАПИСЬ УРОКА И ОТПРАВКА В GEMINI ---
+        // --- 3. СТАРТ (ЗЕЛЕНЫЙ) / СТОП (КРАСНЫЙ) ---
         function toggleRecording() {
             const now = Date.now();
             if (now - lastToggleTime < 1000) return;
             lastToggleTime = now;
 
             if (!audioStream || !screenStream) {
-                log('Сначала нажмите розовую кнопку "1 КЛИК"!', true);
+                log('Сначала нажмите большую кнопку "1 КЛИК: Подключить устройство"!', true);
                 return;
             }
             if (!isRecording) startRecording();
@@ -270,12 +306,13 @@
             captureSlide();
             slideInterval = setInterval(captureSlide, 8000);
 
-            document.getElementById('statusBadge').textContent = '🔴 ИДЕТ ЗАПИСЬ УРОКА';
-            document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-rose-600 text-white text-xs font-bold animate-pulse';
+            document.getElementById('statusBadge').textContent = '🟢 ИДЕТ ЗАПИСЬ УРОКА (+)';
+            document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-emerald-600 text-white text-xs font-bold animate-pulse';
             document.getElementById('btnManualRecord').textContent = '⏹️ Остановить';
             
-            sendLedCommand('RED');
-            log('▶️ Запись началась! Говорите в микрофон...');
+            // Запись ИДЕТ -> зажигаем ЗЕЛЕНЫЙ!
+            sendLedCommand('GREEN');
+            log('▶️ ЗАПИСЬ ПОШЛА! (Диод на плате ЗЕЛЕНЫЙ)');
         }
 
         function stopRecording() {
@@ -285,12 +322,13 @@
                 mediaRecorder.stop();
             }
 
-            document.getElementById('statusBadge').textContent = '🤖 ИИ Gemini пишет конспект...';
-            document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-amber-600 text-white text-xs font-bold animate-pulse';
+            document.getElementById('statusBadge').textContent = '🤖 Запись остановлена • ИИ пишет конспект...';
+            document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-rose-600 text-white text-xs font-bold animate-pulse';
             document.getElementById('btnManualRecord').textContent = '▶️ Старт / Стоп';
 
-            sendLedCommand('GREEN');
-            log('⏹️ Запись остановлена! Отправляем аудио в нейросеть Gemini...');
+            // Запись НЕ ВЕДЕТСЯ -> зажигаем КРАСНЫЙ!
+            sendLedCommand('RED');
+            log('⏹️ Запись остановлена (Диод КРАСНЫЙ). Отправляем аудио в Gemini...');
         }
 
         function captureSlide() {
@@ -326,17 +364,23 @@
                 const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                 const audioBase64 = await blobToBase64(audioBlob);
 
-                const res = await fetch('/api/process', {
+                const res = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         audioBase64,
-                        subject,
-                        slides: currentSlides
+                        subject
                     })
                 });
 
-                const data = await res.json();
+                const rawText = await res.text();
+                let data;
+                try {
+                    data = JSON.parse(rawText);
+                } catch (e) {
+                    throw new Error('Сервер вернул страницу 404 вместо ответа ИИ. Проверьте, что на GitHub создан файл api/process.js и вы открыли сайт malinkiai.vercel.app!');
+                }
+
                 if (!res.ok) throw new Error(data.error || 'Ошибка сервера Vercel');
 
                 const newLesson = {
@@ -349,85 +393,4 @@
                 };
 
                 savedLessons.unshift(newLesson);
-                localStorage.setItem('malinki_lessons', JSON.stringify(savedLessons.slice(0, 15)));
-                renderAllLessons();
-
-                document.getElementById('statusBadge').textContent = '🟢 Конспект готов!';
-                document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-emerald-700 text-white text-xs font-bold';
-                log(`✨ Готово! Конспект "${data.title}" опубликован на портале учеников.`);
-            } catch (err) {
-                document.getElementById('statusBadge').textContent = '⚠️ Ошибка генерации';
-                document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-rose-800 text-white text-xs font-bold';
-                log('Ошибка ИИ: ' + err.message, true);
-            }
-        }
-
-        // --- 4. ОТРИСОВКА ПОРТАЛА УЧЕНИКОВ И СКАЧИВАНИЕ WORD ---
-        function renderAllLessons() {
-            const feed = document.getElementById('studentFeed');
-            document.getElementById('cloudCount').textContent = savedLessons.length;
-
-            if (savedLessons.length === 0) {
-                feed.innerHTML = '<p class="text-xs text-indigo-400">Запишите первый урок, и ИИ опубликует готовый конспект здесь...</p>';
-                return;
-            }
-
-            feed.innerHTML = '';
-            savedLessons.forEach((item, idx) => {
-                const card = document.createElement('div');
-                card.className = 'p-5 bg-indigo-950 border border-indigo-700 rounded-2xl space-y-4';
-                card.innerHTML = `
-                    <div class="flex flex-wrap justify-between items-start gap-2">
-                        <div>
-                            <span class="text-xs px-2.5 py-1 rounded bg-rose-600 text-white font-bold">${item.subject}</span>
-                            <h3 class="font-bold text-lg mt-2 text-white">${item.title}</h3>
-                            <p class="text-xs text-indigo-400">Опубликовано в ${item.time} • Слайдов: ${item.slides.length}</p>
-                        </div>
-                        <button onclick="downloadWord(${idx})" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold transition shadow">
-                            📄 Скачать Word (.doc)
-                        </button>
-                    </div>
-                    <div class="text-sm text-indigo-100 whitespace-pre-line bg-indigo-900/40 p-4 rounded-xl border border-indigo-800 leading-relaxed">${item.summary}</div>
-                    ${item.slides.length > 0 ? `
-                        <div class="grid grid-cols-3 gap-2 pt-1">
-                            ${item.slides.map(s => `<img src="${s}" class="rounded-lg border border-indigo-700 w-full h-24 object-cover">`).join('')}
-                        </div>
-                    ` : ''}
-                `;
-                feed.appendChild(card);
-            });
-        }
-
-        window.downloadWord = function(index) {
-            const item = savedLessons[index];
-            if (!item) return;
-            const slidesHtml = item.slides.map(s => `<p><img src="${s}" width="450" /></p>`).join('');
-            const htmlContent = `
-                <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-                <head><meta charset="utf-8"><title>${item.title}</title></head>
-                <body style="font-family: Arial, sans-serif; line-height: 1.5;">
-                    <p style="color: #e11d48; font-weight: bold;">${item.subject} • Малинки AI</p>
-                    <h1>${item.title}</h1>
-                    <div style="white-space: pre-line; margin-bottom: 20px;">${item.summary}</div>
-                    <h3>Материалы с экрана:</h3>
-                    ${slidesHtml}
-                </body></html>
-            `;
-            const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `Конспект_${item.title.replace(/[^а-яА-Яa-zA-Z0-9]/g, '_')}.doc`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        };
-
-        document.getElementById('btnClearHistory').addEventListener('click', () => {
-            savedLessons = [];
-            localStorage.removeItem('malinki_lessons');
-            renderAllLessons();
-        });
-    </script>
-</body>
-</html>
+                localStorage.setItem('malinki_lessons', JSON.stringify(savedLessons.slice(0, 1
