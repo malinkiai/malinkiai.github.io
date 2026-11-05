@@ -49,40 +49,54 @@ export default async function handler(req, res) {
             }]
         };
 
-        // Функция запроса к актуальной модели gemini-3.0-flash с автоповтором при частых запросах
-        async function callGemini(modelName, attempt = 1) {
-            const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+        // Каскад из разных моделей: если основная перегружена (High demand), мгновенно берется следующая свободная
+        const modelsToTry = [
+            'gemini-3.0-flash',
+            'gemini-3.0-flash-lite-preview',
+            'gemini-flash-lite-latest',
+            'gemini-flash-latest',
+            'gemini-3.0-pro-preview'
+        ];
+
+        let successData = null;
+        let lastErrorMsg = '';
+
+        for (const modelName of modelsToTry) {
+            for (let attempt = 1; attempt <= 2; attempt++) {
+                const response = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    }
+                );
+
+                const data = await response.json();
+
+                if (response.ok && data.candidates) {
+                    successData = data;
+                    break;
                 }
-            );
 
-            const data = await response.json();
+                lastErrorMsg = data.error?.message || `Ошибка ${response.status}`;
 
-            // Если бесплатный тариф просит подождать пару секунд (код 429 или 503) — ждем 3 секунды и повторяем
-            if ((response.status === 429 || response.status === 503) && attempt < 3) {
-                await new Promise(r => setTimeout(r, 3000));
-                return callGemini(modelName, attempt + 1);
+                // Если модель не существует для этого ключа (404), сразу переходим к следующей модели в списке
+                if (response.status === 404 || response.status === 400) {
+                    break;
+                }
+
+                // Если сервер перегружен (503 High demand или 429), ждем 1.5 сек и пробуем еще раз или идем на следующую модель
+                await new Promise(r => setTimeout(r, 1500));
             }
-
-            return { ok: response.ok, status: response.status, data };
+            if (successData) break;
         }
 
-        // Сначала вызываем gemini-3.0-flash, при 404 — резервный алиас gemini-flash-latest
-        let result = await callGemini('gemini-3.0-flash');
-        if (result.status === 404) {
-            result = await callGemini('gemini-flash-latest');
+        if (!successData) {
+            throw new Error(lastErrorMsg);
         }
 
-        if (!result.ok || !result.data.candidates) {
-            const errMsg = result.data?.error?.message || 'Нейросеть не смогла обработать запись. Подождите 15 секунд и попробуйте снова.';
-            throw new Error(errMsg);
-        }
-
-        const fullText = result.data.candidates?.[0]?.content?.parts?.[0]?.text || 'Конспект успешно сформирован.';
+        const fullText = successData.candidates?.[0]?.content?.parts?.[0]?.text || 'Конспект успешно сформирован.';
         const lines = fullText.split('\n').filter(l => l.trim() !== '');
         const title = lines[0]?.replace(/^[#*-\s]+/, '') || `Урок (${subject})`;
         const summary = lines.slice(1).join('\n') || fullText;
