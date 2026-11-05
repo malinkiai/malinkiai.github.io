@@ -29,18 +29,48 @@
         <!-- ВКЛАДКА 1: ПУЛЬТ УЧИТЕЛЯ -->
         <div id="viewTeacher" class="space-y-6">
             <div class="bg-indigo-900/60 border border-indigo-800 rounded-2xl p-6 space-y-5">
-                <div class="flex flex-wrap items-center justify-between gap-4">
-                    <div class="flex gap-3 items-center">
-                        <label class="text-xs text-indigo-300 font-semibold">Предмет и класс:</label>
-                        <select id="subjectSelect" class="bg-indigo-950 border border-indigo-700 rounded-xl px-3 py-2 text-sm font-semibold text-white">
-                            <option value="Физика • 9 класс">Физика • 9 класс</option>
-                            <option value="Алгебра • 10 класс">Алгебра • 10 класс</option>
-                            <option value="История • 8 класс">История • 8 класс</option>
-                            <option value="Информатика • 11 класс">Информатика • 11 класс</option>
-                            <option value="Биология • 7 класс">Биология • 7 класс</option>
-                        </select>
+                <!-- Ручной ввод предмета и класса -->
+                <div class="flex flex-wrap items-end justify-between gap-4">
+                    <div class="flex flex-wrap gap-3 flex-1">
+                        <div class="flex-1 min-w-[160px]">
+                            <label class="block text-xs text-indigo-300 font-semibold mb-1">Предмет (можно вписать свой):</label>
+                            <input id="subjectInput" list="subjectsList" type="text" value="Физика" placeholder="Введите предмет..." 
+                                class="w-full bg-indigo-950 border border-indigo-700 focus:border-rose-500 outline-none rounded-xl px-3 py-2 text-sm font-semibold text-white">
+                            <datalist id="subjectsList">
+                                <option value="Физика">
+                                <option value="Алгебра">
+                                <option value="Геометрия">
+                                <option value="Информатика">
+                                <option value="История">
+                                <option value="Обществознание">
+                                <option value="Химия">
+                                <option value="Биология">
+                                <option value="Русский язык">
+                                <option value="Литература">
+                                <option value="Английский язык">
+                                <option value="География">
+                            </datalist>
+                        </div>
+
+                        <div class="w-36">
+                            <label class="block text-xs text-indigo-300 font-semibold mb-1">Класс / Группа:</label>
+                            <input id="classInput" list="classesList" type="text" value="9Б класс" placeholder="Например: 9Б" 
+                                class="w-full bg-indigo-950 border border-indigo-700 focus:border-rose-500 outline-none rounded-xl px-3 py-2 text-sm font-semibold text-white">
+                            <datalist id="classesList">
+                                <option value="5 класс">
+                                <option value="6 класс">
+                                <option value="7 класс">
+                                <option value="8 класс">
+                                <option value="9 класс">
+                                <option value="9А класс">
+                                <option value="9Б класс">
+                                <option value="10 класс">
+                                <option value="11 класс">
+                            </datalist>
+                        </div>
                     </div>
-                    <div id="statusBadge" class="px-4 py-2 rounded-full bg-indigo-900 border border-indigo-700 text-xs font-bold">
+
+                    <div id="statusBadge" class="px-4 py-2.5 rounded-full bg-indigo-900 border border-indigo-700 text-xs font-bold">
                         ⚪ Ожидание запуска
                     </div>
                 </div>
@@ -62,7 +92,7 @@
 
                 <div class="flex justify-center">
                     <button id="btnConnectBoardOnly" class="text-xs text-indigo-400 hover:text-white underline">
-                        🔌 Переподключить плату RP2040 вручную
+                        🔌 Выбрать плату RP2040 вручную (если не определилась автоматически)
                     </button>
                 </div>
             </div>
@@ -82,7 +112,7 @@
                 <div class="bg-black/50 border border-indigo-800 rounded-2xl p-4">
                     <h3 class="text-xs font-semibold text-indigo-400 mb-2">Системный журнал:</h3>
                     <div id="logBox" class="font-mono text-xs text-emerald-400 space-y-1 max-h-36 overflow-y-auto">
-                        <div>[Система] Готова. Зеленый = запись идет (+), Красный = запись остановлена (-).</div>
+                        <div>[Система] Готова. 🟢 Зеленый = идет запись (+), 🔴 Красный = стоп (-).</div>
                     </div>
                 </div>
             </div>
@@ -98,6 +128,13 @@
                     </div>
                     <button id="btnClearHistory" class="text-xs text-indigo-400 hover:text-rose-400 underline">Очистить тестовые записи</button>
                 </div>
+
+                <!-- Поиск по классу или предмету для учеников -->
+                <div>
+                    <input id="searchFilter" type="text" placeholder="🔍 Поиск по предмету, классу или теме урока..." 
+                        class="w-full bg-indigo-950 border border-indigo-700 focus:border-rose-500 outline-none rounded-xl px-4 py-2.5 text-sm text-white">
+                </div>
+
                 <div id="studentFeed" class="space-y-4 pt-2">
                     <p class="text-xs text-indigo-400">Запишите первый урок, и ИИ опубликует готовый конспект здесь...</p>
                 </div>
@@ -141,74 +178,73 @@
             box.scrollTop = box.scrollHeight;
         }
 
-        // --- 1. НАДЕЖНЫЙ ДРАЙВЕР ПЛАТЫ RP2040-ZERO (RAW BYTES + DTR/RTS) ---
-        let port = null, isReadingSerial = false;
-        const encoder = new TextEncoder();
-        const decoder = new TextDecoder();
+        function getFullSubject() {
+            const subj = document.getElementById('subjectInput').value.trim() || 'Урок';
+            const cls = document.getElementById('classInput').value.trim();
+            return cls ? `${subj} • ${cls}` : subj;
+        }
+
+        // --- 1. СТАБИЛЬНЫЙ ПОТОКОВЫЙ ДРАЙВЕР ПЛАТЫ RP2040-ZERO ---
+        let port = null, writer = null, isReadingSerial = false;
 
         async function connectSerial(selectedPort) {
             if (isReadingSerial) return;
             try {
                 port = selectedPort;
                 await port.open({ baudRate: 115200 });
-                
-                // КРИТИЧЕСКИ ВАЖНО ДЛЯ MICROPYTHON RP2040: включаем линии DTR и RTS, чтобы плата отправляла данные кнопки!
-                await port.setSignals({ dataTerminalReady: true, requestToSend: true });
                 isReadingSerial = true;
 
                 document.getElementById('serialStatus').textContent = '🔌 Плата: Подключена ✅';
                 document.getElementById('serialStatus').className = 'p-2.5 rounded-lg bg-emerald-900/60 text-emerald-300 font-semibold text-center';
-                log('Плата RP2040 подключена! Слушаю кнопку BOOT...');
+                log('Плата RP2040-Zero подключена!');
 
-                // Запускаем чтение кнопки сразу
-                readSerialLoop();
+                const textEncoder = new TextEncoderStream();
+                textEncoder.readable.pipeTo(port.writable);
+                writer = textEncoder.writable.getWriter();
 
-                // Даем плате 600 мс спокойно инициализироваться и зажигаем КРАСНЫЙ (запись не идет)
-                setTimeout(() => sendLedCommand('RED'), 600);
+                // Запускаем фоновое чтение кнопки BOOT (без await, чтобы не блокировать интерфейс)
+                startReadingButton();
             } catch (err) {
                 isReadingSerial = false;
-                log('Ошибка USB (закройте Thonny и другие вкладки): ' + err.message, true);
+                log('Инфо USB: ' + err.message, true);
             }
         }
 
-        async function readSerialLoop() {
-            while (port && port.readable && isReadingSerial) {
-                const reader = port.readable.getReader();
-                let buffer = "";
-                try {
-                    while (true) {
-                        const { value, done } = await reader.read();
-                        if (done) break;
-                        if (value) {
-                            const chunk = decoder.decode(value, { stream: true });
-                            buffer += chunk;
-
-                            // Реагируем на CLICK или любую строчку от кнопки платы
-                            if (buffer.includes('CLICK') || buffer.includes('BTN') || buffer.includes('1')) {
-                                buffer = "";
-                                log('🔘 Получен сигнал CLICK от кнопки на плате!');
-                                toggleRecording();
-                            }
-                            if (buffer.length > 60) buffer = "";
-                        }
-                    }
-                } catch (err) {
-                    log('Потеряна связь с платой: ' + err.message, true);
-                    break;
-                } finally {
-                    reader.releaseLock();
-                }
-            }
-            isReadingSerial = false;
-        }
-
-        async function sendLedCommand(cmd) {
-            if (!port || !port.writable) return;
+        async function startReadingButton() {
             try {
-                const writer = port.writable.getWriter();
-                await writer.write(encoder.encode(cmd + '\r\n'));
-                writer.releaseLock();
-            } catch (e) {}
+                const textDecoder = new TextDecoderStream();
+                port.readable.pipeTo(textDecoder.writable);
+                const reader = textDecoder.readable.getReader();
+
+                let buffer = "";
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    if (value) {
+                        buffer += value;
+                        if (buffer.includes('CLICK')) {
+                            buffer = "";
+                            log('🔘 Нажата кнопка BOOT на плате!');
+                            toggleRecording();
+                        }
+                        if (buffer.length > 50) buffer = "";
+                    }
+                }
+            } catch (err) {
+                isReadingSerial = false;
+                log('Связь с платой прервана: ' + err.message, true);
+            }
+        }
+
+        // Отправка команды цвета с небольшой задержкой 150 мс, чтобы не перебивать опрос кнопки на плате
+        function sendLedCommand(cmd) {
+            setTimeout(async () => {
+                if (writer) {
+                    try {
+                        await writer.write(cmd + '\n');
+                    } catch (e) {}
+                }
+            }, 150);
         }
 
         let savedLessons = JSON.parse(localStorage.getItem('malinki_lessons') || '[]');
@@ -225,15 +261,38 @@
             try {
                 const newPort = await navigator.serial.requestPort();
                 await connectSerial(newPort);
+                sendLedCommand('RED');
             } catch (e) {
                 log('Выбор платы отменен.', true);
             }
         });
 
-        // --- 2. ПОДГОТОВКА В 1 КЛИК ---
-        let audioStream = null, screenStream = null, mediaRecorder = null;
+        // --- 2. ПОДГОТОВКА В 1 КЛИК (ПЛАТА + МИКРОФОН + ЗВУК ПК + ЭКРАН) ---
+        let combinedAudioStream = null, screenStream = null, mediaRecorder = null;
         let audioChunks = [], currentSlides = [], isRecording = false, slideInterval = null;
         let lastToggleTime = 0;
+
+        // Смешиваем микрофон и системный звук компьютера (если включен при демонстрации экрана)
+        function mixAudioStreams(micStream, displayStream) {
+            const sysTracks = displayStream ? displayStream.getAudioTracks() : [];
+            if (sysTracks.length === 0) return micStream;
+
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const dest = ctx.createMediaStreamDestination();
+
+                const micSource = ctx.createMediaStreamSource(micStream);
+                micSource.connect(dest);
+
+                const sysSource = ctx.createMediaStreamSource(new MediaStream(sysTracks));
+                sysSource.connect(dest);
+
+                log('🔊 Звук видеоурока с ПК и микрофон объединены в одну дорожку!');
+                return dest.stream;
+            } catch (e) {
+                return micStream;
+            }
+        }
 
         document.getElementById('btnOneClickSetup').addEventListener('click', async () => {
             try {
@@ -243,31 +302,35 @@
                         if (ports.length > 0) await connectSerial(ports[0]);
                         else await connectSerial(await navigator.serial.requestPort());
                     } catch (e) {
-                        log('Плата не выбрана, можно управлять кнопкой на экране.');
+                        log('Плата не выбрана, доступно управление кнопкой на экране.');
                     }
                 }
 
-                audioStream = await navigator.mediaDevices.getUserMedia({
+                const micStream = await navigator.mediaDevices.getUserMedia({
                     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
                 });
-                const micLabel = audioStream.getAudioTracks()[0].label || 'USB Микрофон';
-                log('🎤 Микрофон готов: ' + micLabel);
+                const micLabel = micStream.getAudioTracks()[0].label || 'USB Микрофон';
+                log('🎤 Микрофон подключен: ' + micLabel);
 
-                screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                // Запрашиваем экран (с возможностью захвата звука компьютера для видеоуроков)
+                screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
                 const video = document.getElementById('screenVideo');
                 video.srcObject = screenStream;
                 await video.play();
 
+                combinedAudioStream = mixAudioStreams(micStream, screenStream);
+
                 document.getElementById('mediaStatus').textContent = '🎤 Микрофон и экран: Готовы ✅';
                 document.getElementById('mediaStatus').className = 'p-2.5 rounded-lg bg-emerald-900/60 text-emerald-300 font-semibold text-center';
                 
-                document.getElementById('btnOneClickSetup').textContent = '✅ СИСТЕМА ГОТОВА — ЖМИТЕ КНОПКУ BOOT НА ПЛАТЕ';
+                document.getElementById('btnOneClickSetup').textContent = '✅ СИСТЕМА АКТИВНА — ЖМИТЕ КНОПКУ BOOT НА ПЛАТЕ';
                 document.getElementById('btnOneClickSetup').className = 'flex-1 py-4 bg-emerald-700 rounded-2xl text-lg font-bold shadow-lg';
                 document.getElementById('btnManualRecord').disabled = false;
                 document.getElementById('statusBadge').textContent = '🔴 Запись не ведется (Жду нажатия)';
                 
+                // Запись пока не ведется -> включаем КРАСНЫЙ диод
                 sendLedCommand('RED');
-                log('🎉 Система готова! Сейчас горит КРАСНЫЙ (запись не идет). Нажмите кнопку на плате для старта!');
+                log('🎉 Готово к уроку! Диод КРАСНЫЙ (стоп). Нажмите BOOT для старта записи (загорится ЗЕЛЕНЫЙ).');
             } catch (err) {
                 log('Ошибка при подготовке: ' + err.message, true);
             }
@@ -275,14 +338,14 @@
 
         document.getElementById('btnManualRecord').addEventListener('click', toggleRecording);
 
-        // --- 3. СТАРТ (ЗЕЛЕНЫЙ) / СТОП (КРАСНЫЙ) ---
+        // --- 3. ЗАПИСЬ: ЗЕЛЕНЫЙ = ИДЕТ ЗАПИСЬ (+), КРАСНЫЙ = СТОП (-) ---
         function toggleRecording() {
             const now = Date.now();
-            if (now - lastToggleTime < 1000) return;
+            if (now - lastToggleTime < 800) return;
             lastToggleTime = now;
 
-            if (!audioStream || !screenStream) {
-                log('Кнопка на плате сработала! Но сначала нажмите розовую кнопку "1 КЛИК", чтобы дать доступ к микрофону и экрану!', true);
+            if (!combinedAudioStream || !screenStream) {
+                log('Сначала нажмите кнопку "1 КЛИК" на экране!', true);
                 return;
             }
             if (!isRecording) startRecording();
@@ -296,7 +359,11 @@
             document.getElementById('slideCount').textContent = '0 шт.';
             document.getElementById('slidesGallery').innerHTML = '';
 
-            mediaRecorder = new MediaRecorder(audioStream, { audioBitsPerSecond: 32000 });
+            const options = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                ? { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 24000 }
+                : { audioBitsPerSecond: 24000 };
+
+            mediaRecorder = new MediaRecorder(combinedAudioStream, options);
             mediaRecorder.ondataavailable = e => {
                 if (e.data && e.data.size > 0) audioChunks.push(e.data);
             };
@@ -307,12 +374,12 @@
             slideInterval = setInterval(captureSlide, 8000);
 
             document.getElementById('statusBadge').textContent = '🟢 ИДЕТ ЗАПИСЬ УРОКА (+)';
-            document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-emerald-600 text-white text-xs font-bold animate-pulse';
+            document.getElementById('statusBadge').className = 'px-4 py-2.5 rounded-full bg-emerald-600 text-white text-xs font-bold animate-pulse';
             document.getElementById('btnManualRecord').textContent = '⏹️ Остановить';
             
-            // Запись ИДЕТ -> ЗЕЛЕНЫЙ свет
+            // Запись идет -> ЗЕЛЕНЫЙ
             sendLedCommand('GREEN');
-            log('▶️ ЗАПИСЬ ПОШЛА! (На плате горит ЗЕЛЕНЫЙ)');
+            log(`▶️ Запись урока (${getFullSubject()}) началась! Диод ЗЕЛЕНЫЙ.`);
         }
 
         function stopRecording() {
@@ -322,13 +389,13 @@
                 mediaRecorder.stop();
             }
 
-            document.getElementById('statusBadge').textContent = '🤖 Запись остановлена • ИИ пишет конспект...';
-            document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-rose-600 text-white text-xs font-bold animate-pulse';
+            document.getElementById('statusBadge').textContent = '🤖 ИИ Gemini 3.0 пишет конспект...';
+            document.getElementById('statusBadge').className = 'px-4 py-2.5 rounded-full bg-amber-600 text-white text-xs font-bold animate-pulse';
             document.getElementById('btnManualRecord').textContent = '▶️ Старт / Стоп';
 
-            // Запись НЕ ВЕДЕТСЯ -> КРАСНЫЙ свет
+            // Запись остановлена -> КРАСНЫЙ
             sendLedCommand('RED');
-            log('⏹️ Запись остановлена (На плате горит КРАСНЫЙ). ИИ Gemini 3.0 формирует конспект...');
+            log('⏹️ Запись остановлена! Диод КРАСНЫЙ. Отправляем аудио в нейросеть...');
         }
 
         function captureSlide() {
@@ -360,7 +427,7 @@
 
         async function processWithAI() {
             try {
-                const subject = document.getElementById('subjectSelect').value;
+                const subject = getFullSubject();
                 const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                 const audioBase64 = await blobToBase64(audioBlob);
 
@@ -378,7 +445,7 @@
                 try {
                     data = JSON.parse(rawText);
                 } catch (e) {
-                    throw new Error('Сервер вернул некорректный ответ. Подождите 15 секунд после обновления GitHub.');
+                    throw new Error('Сервер еще обновляется после сохранения на GitHub. Подождите 15 секунд.');
                 }
 
                 if (!res.ok) throw new Error(data.error || 'Ошибка сервера Vercel');
@@ -393,30 +460,40 @@
                 };
 
                 savedLessons.unshift(newLesson);
-                localStorage.setItem('malinki_lessons', JSON.stringify(savedLessons.slice(0, 15)));
+                localStorage.setItem('malinki_lessons', JSON.stringify(savedLessons.slice(0, 20)));
                 renderAllLessons();
 
                 document.getElementById('statusBadge').textContent = '🔴 Запись не ведется (Конспект готов!)';
-                document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-indigo-900 border border-indigo-700 text-xs font-bold';
-                log(`✨ УСПЕХ! Конспект "${data.title}" опубликован! Откройте вкладку "Портал учеников".`);
+                document.getElementById('statusBadge').className = 'px-4 py-2.5 rounded-full bg-indigo-900 border border-indigo-700 text-xs font-bold';
+                log(`✨ УСПЕХ! Конспект "${data.title}" (${subject}) опубликован на Портале учеников!`);
             } catch (err) {
                 document.getElementById('statusBadge').textContent = '⚠️ Ошибка генерации';
                 log('Ошибка ИИ: ' + err.message, true);
             }
         }
 
-        // --- 4. ПОРТАЛ УЧЕНИКОВ ---
+        // --- 4. ПОРТАЛ УЧЕНИКОВ С ПОИСКОМ И СКАЧИВАНИЕМ WORD ---
+        document.getElementById('searchFilter').addEventListener('input', renderAllLessons);
+
         function renderAllLessons() {
             const feed = document.getElementById('studentFeed');
+            const query = (document.getElementById('searchFilter')?.value || '').toLowerCase().trim();
             document.getElementById('cloudCount').textContent = savedLessons.length;
 
-            if (savedLessons.length === 0) {
-                feed.innerHTML = '<p class="text-xs text-indigo-400">Запишите первый урок, и ИИ опубликует готовый конспект здесь...</p>';
+            const filtered = savedLessons.filter(item =>
+                item.subject.toLowerCase().includes(query) ||
+                item.title.toLowerCase().includes(query) ||
+                item.summary.toLowerCase().includes(query)
+            );
+
+            if (filtered.length === 0) {
+                feed.innerHTML = '<p class="text-xs text-indigo-400">Конспекты не найдены. Запишите урок, и ИИ опубликует его здесь...</p>';
                 return;
             }
 
             feed.innerHTML = '';
-            savedLessons.forEach((item, idx) => {
+            filtered.forEach((item) => {
+                const realIdx = savedLessons.indexOf(item);
                 const card = document.createElement('div');
                 card.className = 'p-5 bg-indigo-950 border border-indigo-700 rounded-2xl space-y-4';
                 card.innerHTML = `
@@ -426,7 +503,7 @@
                             <h3 class="font-bold text-lg mt-2 text-white">${item.title}</h3>
                             <p class="text-xs text-indigo-400">Опубликовано в ${item.time} • Слайдов: ${item.slides.length}</p>
                         </div>
-                        <button onclick="downloadWord(${idx})" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold transition shadow">
+                        <button onclick="downloadWord(${realIdx})" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold transition shadow">
                             📄 Скачать Word (.doc)
                         </button>
                     </div>
