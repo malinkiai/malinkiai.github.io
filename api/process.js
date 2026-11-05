@@ -7,7 +7,6 @@ export const config = {
 };
 
 export default async function handler(req, res) {
-    // Разрешаем запросы и с vercel.app, и с github.io
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -26,40 +25,56 @@ export default async function handler(req, res) {
 
         if (!geminiKey) {
             return res.status(500).json({
-                error: 'Ключ GEMINI_API_KEY не найден в настройках Vercel (Settings -> Environment Variables)!'
+                error: 'Ключ GEMINI_API_KEY не найден в настройках Vercel!'
             });
         }
 
-        const geminiRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            {
-                                text: `Ты школьный ИИ-помощник проекта "Малинки AI". Прослушай аудиозапись школьного урока по предмету "${subject}" и составь структурированный, понятный конспект для учеников.
+        const payload = {
+            contents: [{
+                parts: [
+                    {
+                        text: `Ты школьный ИИ-помощник проекта "Малинки AI". Прослушай аудиозапись школьного урока по предмету "${subject}" и составь структурированный, понятный конспект для учеников.
 Правила оформления:
 1. Первой строкой напиши ТОЛЬКО краткую тему урока (без слов "Тема:", без решеток # и звездочек *).
 2. Со второй строки напиши сам конспект: выдели главные определения, формулы, правила и ключевые мысли учителя удобным списком.
-3. Если на записи тишина или тест микрофона, напиши первой строкой "Проверка связи — ${subject}", а ниже кратко напиши, что было слышно на записи.`
-                            },
-                            {
-                                inlineData: {
-                                    mimeType: 'audio/webm',
-                                    data: audioBase64
-                                }
-                            }
-                        ]
-                    }]
-                })
-            }
-        );
+3. Если на записи тишина или короткая проверка микрофона, напиши первой строкой "Тестовый урок — ${subject}", а со второй строки кратко напиши, что именно было произнесено на записи.`
+                    },
+                    {
+                        inlineData: {
+                            mimeType: 'audio/webm',
+                            data: audioBase64
+                        }
+                    }
+                ]
+            }]
+        };
 
-        const geminiData = await geminiRes.json();
-        if (!geminiRes.ok) {
-            throw new Error(geminiData.error?.message || 'Ошибка при обращении к Gemini API');
+        // Список актуальных моделей по очереди (если одна недоступна, берется следующая)
+        const models = ['gemini-3.0-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
+        let geminiData = null;
+        let lastError = '';
+
+        for (const model of models) {
+            const geminiRes = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }
+            );
+
+            const data = await geminiRes.json();
+            if (geminiRes.ok && data.candidates) {
+                geminiData = data;
+                break;
+            } else {
+                lastError = data.error?.message || `Ошибка модели ${model}`;
+            }
+        }
+
+        if (!geminiData) {
+            throw new Error(lastError);
         }
 
         const fullText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 'Конспект успешно сформирован.';
