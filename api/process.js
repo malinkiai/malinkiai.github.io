@@ -7,19 +7,26 @@ export const config = {
 };
 
 export default async function handler(req, res) {
+    // Разрешаем запросы и с vercel.app, и с github.io
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Разрешены только POST запросы' });
     }
 
     try {
-        const { audioBase64, subject, slides } = req.body;
+        const { audioBase64, subject } = req.body;
         const geminiKey = process.env.GEMINI_API_KEY;
-        const supabaseUrl = process.env.SUPABASE_URL;
-        const supabaseKey = process.env.SUPABASE_KEY;
 
         if (!geminiKey) {
             return res.status(500).json({
-                error: 'Ключ GEMINI_API_KEY не найден в настройках Vercel (Environment Variables)!'
+                error: 'Ключ GEMINI_API_KEY не найден в настройках Vercel (Settings -> Environment Variables)!'
             });
         }
 
@@ -36,7 +43,7 @@ export default async function handler(req, res) {
 Правила оформления:
 1. Первой строкой напиши ТОЛЬКО краткую тему урока (без слов "Тема:", без решеток # и звездочек *).
 2. Со второй строки напиши сам конспект: выдели главные определения, формулы, правила и ключевые мысли учителя удобным списком.
-3. Если на записи плохо слышно речь или тишина, напиши: "Тестовая запись микрофона" первой строкой, а ниже — что звук успешно дошел до сервера, но речь была слишком тихой.`
+3. Если на записи тишина или тест микрофона, напиши первой строкой "Проверка связи — ${subject}", а ниже кратко напиши, что было слышно на записи.`
                             },
                             {
                                 inlineData: {
@@ -59,20 +66,6 @@ export default async function handler(req, res) {
         const lines = fullText.split('\n').filter(l => l.trim() !== '');
         const title = lines[0]?.replace(/^[#*-\s]+/, '') || `Урок (${subject})`;
         const summary = lines.slice(1).join('\n') || fullText;
-
-        // Автоматическое сохранение в Supabase (если добавите базу позже)
-        if (supabaseUrl && supabaseKey) {
-            await fetch(`${supabaseUrl}/rest/v1/lessons`, {
-                method: 'POST',
-                headers: {
-                    'apikey': supabaseKey,
-                    'Authorization': `Bearer ${supabaseKey}`,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=minimal'
-                },
-                body: JSON.stringify({ subject, title, summary, slides: slides || [] })
-            });
-        }
 
         return res.status(200).json({ title, summary });
     } catch (err) {
