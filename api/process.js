@@ -6,13 +6,17 @@ export const config = {
     },
 };
 
+// Выносим название модели в константу. 
+// gemini-1.5-flash — это самая стабильная бесплатная мультимодальная модель на текущий момент.
+const MODEL_NAME = 'gemini-1.5-flash';
+
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     if (req.method === 'OPTIONS') return res.status(200).end();
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Разрешены только POST запросы' });
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Только POST запросы' });
 
     try {
         const { audioBase64, subject, slides } = req.body;
@@ -24,82 +28,94 @@ export default async function handler(req, res) {
 
         const parts = [
             {
-                text: `Ты школьный ИИ-помощник проекта "Малинки AI". Проанализируй школьный урок (${subject}).
-Мы передаем тебе аудиозапись с микрофона и скриншоты экрана/презентации учителя.
-Так как микрофон может записывать тихо, ОБЯЗАТЕЛЬНО прочитай весь текст, заголовки, определения и формулы со скриншотов слайдов и объедини их с тем, что слышно на аудио!
-Правила оформления:
+                text: `Ты школьный ИИ-помощник проекта "Малинки AI". Составь подробный и понятный учебный конспект урока (${subject}) для школьников.
+Обязательно используй информацию, текст, формулы и схемы со скриншотов экрана/презентации, а также голос учителя с аудиозаписи (если речь тихая или с помехами — опирайся на слайды!).
+Правила ответа:
 1. Первой строкой напиши ТОЛЬКО краткую тему урока (без слов "Тема:", без символов # и *).
-2. Со второй строки напиши подробный, структурированный конспект для учеников (основные понятия, формулы, тезисы со слайдов и объяснения учителя).`
-            },
-            {
-                inlineData: {
-                    mimeType: 'audio/webm',
-                    data: audioBase64
-                }
+2. Со второй строки напиши структурированный конспект: основные определения, формулы, правила и тезисы списком.`
             }
         ];
 
-        // Прикрепляем до 4 ключевых слайдов, чтобы не перегружать лимит бесплатного тарифа
-        if (slides && Array.isArray(slides) && slides.length > 0) {
+        // Прикрепляем аудио, если оно не пустое
+        if (audioBase64 && audioBase64.length > 100) {
+            // Защита: если вдруг пришел data:audio/webm;base64,..., отрезаем префикс
+            const cleanAudioBase64 = audioBase64.includes(',') ? audioBase64.split(',')[1] : audioBase64;
+            parts.push({
+                inlineData: {
+                    mimeType: 'audio/webm',
+                    data: cleanAudioBase64
+                }
+            });
+        }
+
+        // Прикрепляем до 4 ключевых слайдов урока
+        if (Array.isArray(slides) && slides.length > 0) {
             const selectedSlides = slides.slice(0, 4);
             for (const slideDataUrl of selectedSlides) {
-                const base64Img = slideDataUrl.split(',')[1];
-                if (base64Img) {
-                    parts.push({
-                        inlineData: {
-                            mimeType: 'image/jpeg',
-                            data: base64Img
-                        }
-                    });
+                if (typeof slideDataUrl === 'string' && slideDataUrl.includes(',')) {
+                    const base64Img = slideDataUrl.split(',')[1];
+                    if (base64Img) {
+                        parts.push({
+                            inlineData: {
+                                mimeType: 'image/jpeg',
+                                data: base64Img
+                            }
+                        });
+                    }
                 }
             }
         }
 
-        const payload = { contents: [{ parts }] };
+        let successData = null;
+        let lastErrorMsg = '';
 
-        // Вызываем ТОЛЬКО рабочую модель gemini-3.0-flash с автоповтором при вечерней нагрузке (503/429)
-        async function callGeminiWithRetry(modelName, maxAttempts = 3) {
-            let lastErr = '';
-            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-                const response = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`,
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    }
-                );
+        for (let attempt = 1; attempt <= 4; attempt++) {
+            // Формируем URL строго с проверенной моделью
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${geminiKey}`;
+            
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    contents: [{ parts }] 
+                })
+            });
 
-                const data = await response.json();
+            const data = await response.json();
 
-                if (response.ok && data.candidates) {
-                    return { ok: true, data };
-                }
-
-                lastErr = data.error?.message || `Ошибка сервера (${response.status})`;
-
-                if (response.status === 503 || response.status === 429) {
-                    await new Promise(r => setTimeout(r, 2500 * attempt));
-                    continue;
-                }
+            if (response.ok && data.candidates) {
+                successData = data;
                 break;
             }
-            return { ok: false, error: lastErr };
+
+            lastErrorMsg = data.error?.message || `Ошибка сервера (${response.status})`;
+            
+            // Логируем ошибку в консоль Vercel для отладки
+            console.error(`[Gemini API Error] Attempt ${attempt}:`, lastErrorMsg, data.error);
+
+            // Если сервер занят (503 High Demand или 429), ждем и пробуем снова
+            if (response.status === 503 || response.status === 429) {
+                await new Promise(r => setTimeout(r, 2500));
+            } else {
+                break; // При других ошибках (например, 400 Bad Request) нет смысла повторять
+            }
         }
 
-        let result = await callGeminiWithRetry('gemini-3.0-flash', 3);
-
-        if (!result.ok) {
-            throw new Error(result.error);
+        if (!successData) {
+            throw new Error(lastErrorMsg || 'Не удалось получить ответ от ИИ после нескольких попыток');
         }
 
-        const fullText = result.data.candidates?.[0]?.content?.parts?.[0]?.text || 'Конспект успешно сформирован.';
+        const fullText = successData.candidates?.[0]?.content?.parts?.[0]?.text || 'Конспект успешно создан.';
         const lines = fullText.split('\n').filter(l => l.trim() !== '');
-        const title = lines[0]?.replace(/^[#*-\s]+/, '') || `Урок (${subject})`;
-        const summary = lines.slice(1).join('\n') || fullText;
+        
+        // Очищаем первую строку от любых маркеров, если ИИ всё же их добавил
+        const title = lines[0]?.replace(/^[#*-\s]+/, '').trim() || `Урок (${subject})`;
+        const summary = lines.slice(1).join('\n').trim() || fullText;
 
         return res.status(200).json({ title, summary });
+        
     } catch (err) {
-         return res.status(500).json({ error: err.message });
+        console.error('[API Handler Critical Error]:', err);
+        return res.status(500).json({ error: err.message || 'Внутренняя ошибка сервера' });
     }
 }
