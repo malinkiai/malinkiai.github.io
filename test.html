@@ -57,12 +57,12 @@
                 <div class="grid grid-cols-3 gap-2 text-xs">
                     <div id="serialStatus" class="p-2.5 rounded-lg bg-indigo-950 text-indigo-300 text-center">🔌 Плата: не подключена</div>
                     <div id="mediaStatus" class="p-2.5 rounded-lg bg-indigo-950 text-indigo-300 text-center">🎤 Микрофон и экран: не активны</div>
-                    <div class="p-2.5 rounded-lg bg-emerald-950/60 text-emerald-300 text-center font-semibold">🤖 Нейросеть Gemini: Готова</div>
+                    <div class="p-2.5 rounded-lg bg-emerald-950/60 text-emerald-300 text-center font-semibold">🤖 Нейросеть Gemini 3.0: Готова</div>
                 </div>
 
                 <div class="flex justify-center">
                     <button id="btnConnectBoardOnly" class="text-xs text-indigo-400 hover:text-white underline">
-                        🔌 Выбрать плату RP2040 вручную (если не выбралась)
+                        🔌 Переподключить плату RP2040 вручную
                     </button>
                 </div>
             </div>
@@ -82,7 +82,7 @@
                 <div class="bg-black/50 border border-indigo-800 rounded-2xl p-4">
                     <h3 class="text-xs font-semibold text-indigo-400 mb-2">Системный журнал:</h3>
                     <div id="logBox" class="font-mono text-xs text-emerald-400 space-y-1 max-h-36 overflow-y-auto">
-                        <div>[Система] Готова. Зеленый диод = запись идет, Красный = запись остановлена.</div>
+                        <div>[Система] Готова. Зеленый = запись идет (+), Красный = запись остановлена (-).</div>
                     </div>
                 </div>
             </div>
@@ -106,7 +106,6 @@
     </div>
 
     <script>
-        // Автоматический выбор адреса сервера Vercel (работает даже при открытии с github.io)
         const API_URL = window.location.hostname.includes('vercel.app')
             ? '/api/process'
             : 'https://malinkiai.vercel.app/api/process';
@@ -142,65 +141,74 @@
             box.scrollTop = box.scrollHeight;
         }
 
-        // --- 1. ПОДКЛЮЧЕНИЕ ПЛАТЫ RP2040-ZERO (БЕЗ БЛОКИРОВКИ ПОТОКА) ---
-        let port = null, writer = null, isReadingSerial = false;
+        // --- 1. НАДЕЖНЫЙ ДРАЙВЕР ПЛАТЫ RP2040-ZERO (RAW BYTES + DTR/RTS) ---
+        let port = null, isReadingSerial = false;
+        const encoder = new TextEncoder();
+        const decoder = new TextDecoder();
 
         async function connectSerial(selectedPort) {
             if (isReadingSerial) return;
             try {
                 port = selectedPort;
                 await port.open({ baudRate: 115200 });
+                
+                // КРИТИЧЕСКИ ВАЖНО ДЛЯ MICROPYTHON RP2040: включаем линии DTR и RTS, чтобы плата отправляла данные кнопки!
+                await port.setSignals({ dataTerminalReady: true, requestToSend: true });
                 isReadingSerial = true;
 
                 document.getElementById('serialStatus').textContent = '🔌 Плата: Подключена ✅';
                 document.getElementById('serialStatus').className = 'p-2.5 rounded-lg bg-emerald-900/60 text-emerald-300 font-semibold text-center';
-                log('Плата RP2040-Zero успешно подключена!');
+                log('Плата RP2040 подключена! Слушаю кнопку BOOT...');
 
-                const textEncoder = new TextEncoderStream();
-                textEncoder.readable.pipeTo(port.writable);
-                writer = textEncoder.writable.getWriter();
-
-                // Сразу зажигаем КРАСНЫЙ (запись пока не ведется)
-                await sendLedCommand('RED');
-
-                // Запускаем фоновое чтение кнопки BOOT (без await, чтобы не вешать сайт!)
+                // Запускаем чтение кнопки сразу
                 readSerialLoop();
+
+                // Даем плате 600 мс спокойно инициализироваться и зажигаем КРАСНЫЙ (запись не идет)
+                setTimeout(() => sendLedCommand('RED'), 600);
             } catch (err) {
                 isReadingSerial = false;
-                log('Ошибка USB-порта (закройте другие вкладки с платой): ' + err.message, true);
+                log('Ошибка USB (закройте Thonny и другие вкладки): ' + err.message, true);
             }
         }
 
         async function readSerialLoop() {
-            try {
-                const textDecoder = new TextDecoderStream();
-                port.readable.pipeTo(textDecoder.writable);
-                const reader = textDecoder.readable.getReader();
-
+            while (port && port.readable && isReadingSerial) {
+                const reader = port.readable.getReader();
                 let buffer = "";
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    if (value) {
-                        buffer += value;
-                        if (buffer.includes('CLICK')) {
-                            buffer = "";
-                            log('🔘 Нажата физическая кнопка BOOT на плате!');
-                            toggleRecording();
+                try {
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        if (value) {
+                            const chunk = decoder.decode(value, { stream: true });
+                            buffer += chunk;
+
+                            // Реагируем на CLICK или любую строчку от кнопки платы
+                            if (buffer.includes('CLICK') || buffer.includes('BTN') || buffer.includes('1')) {
+                                buffer = "";
+                                log('🔘 Получен сигнал CLICK от кнопки на плате!');
+                                toggleRecording();
+                            }
+                            if (buffer.length > 60) buffer = "";
                         }
-                        if (buffer.length > 50) buffer = "";
                     }
+                } catch (err) {
+                    log('Потеряна связь с платой: ' + err.message, true);
+                    break;
+                } finally {
+                    reader.releaseLock();
                 }
-            } catch (err) {
-                isReadingSerial = false;
-                log('Связь с платой прервана: ' + err.message, true);
             }
+            isReadingSerial = false;
         }
 
         async function sendLedCommand(cmd) {
-            if (writer) {
-                try { await writer.write(cmd + '\n'); } catch (e) {}
-            }
+            if (!port || !port.writable) return;
+            try {
+                const writer = port.writable.getWriter();
+                await writer.write(encoder.encode(cmd + '\r\n'));
+                writer.releaseLock();
+            } catch (e) {}
         }
 
         let savedLessons = JSON.parse(localStorage.getItem('malinki_lessons') || '[]');
@@ -222,36 +230,29 @@
             }
         });
 
-        // --- 2. ПОДГОТОВКА В 1 КЛИК (ПЛАТА + МИКРОФОН + ЭКРАН) ---
+        // --- 2. ПОДГОТОВКА В 1 КЛИК ---
         let audioStream = null, screenStream = null, mediaRecorder = null;
         let audioChunks = [], currentSlides = [], isRecording = false, slideInterval = null;
         let lastToggleTime = 0;
 
         document.getElementById('btnOneClickSetup').addEventListener('click', async () => {
             try {
-                // 1. Подключаем плату (теперь не блокирует дальнейший код!)
                 if (!isReadingSerial && 'serial' in navigator) {
                     try {
                         const ports = await navigator.serial.getPorts();
-                        if (ports.length > 0) {
-                            await connectSerial(ports[0]);
-                        } else {
-                            const newPort = await navigator.serial.requestPort();
-                            await connectSerial(newPort);
-                        }
+                        if (ports.length > 0) await connectSerial(ports[0]);
+                        else await connectSerial(await navigator.serial.requestPort());
                     } catch (e) {
-                        log('Плата не выбрана, можно использовать кнопку на экране.');
+                        log('Плата не выбрана, можно управлять кнопкой на экране.');
                     }
                 }
 
-                // 2. Подключаем микрофон
                 audioStream = await navigator.mediaDevices.getUserMedia({
                     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
                 });
                 const micLabel = audioStream.getAudioTracks()[0].label || 'USB Микрофон';
                 log('🎤 Микрофон готов: ' + micLabel);
 
-                // 3. Подключаем захват экрана
                 screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
                 const video = document.getElementById('screenVideo');
                 video.srcObject = screenStream;
@@ -265,9 +266,8 @@
                 document.getElementById('btnManualRecord').disabled = false;
                 document.getElementById('statusBadge').textContent = '🔴 Запись не ведется (Жду нажатия)';
                 
-                // Запись пока НЕ идет -> горит КРАСНЫЙ
                 sendLedCommand('RED');
-                log('🎉 Система готова! Диод КРАСНЫЙ (запись не идет). Нажмите кнопку BOOT для старта!');
+                log('🎉 Система готова! Сейчас горит КРАСНЫЙ (запись не идет). Нажмите кнопку на плате для старта!');
             } catch (err) {
                 log('Ошибка при подготовке: ' + err.message, true);
             }
@@ -282,7 +282,7 @@
             lastToggleTime = now;
 
             if (!audioStream || !screenStream) {
-                log('Сначала нажмите большую кнопку "1 КЛИК: Подключить устройство"!', true);
+                log('Кнопка на плате сработала! Но сначала нажмите розовую кнопку "1 КЛИК", чтобы дать доступ к микрофону и экрану!', true);
                 return;
             }
             if (!isRecording) startRecording();
@@ -310,9 +310,9 @@
             document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-emerald-600 text-white text-xs font-bold animate-pulse';
             document.getElementById('btnManualRecord').textContent = '⏹️ Остановить';
             
-            // Запись ИДЕТ -> зажигаем ЗЕЛЕНЫЙ!
+            // Запись ИДЕТ -> ЗЕЛЕНЫЙ свет
             sendLedCommand('GREEN');
-            log('▶️ ЗАПИСЬ ПОШЛА! (Диод на плате ЗЕЛЕНЫЙ)');
+            log('▶️ ЗАПИСЬ ПОШЛА! (На плате горит ЗЕЛЕНЫЙ)');
         }
 
         function stopRecording() {
@@ -326,9 +326,9 @@
             document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-rose-600 text-white text-xs font-bold animate-pulse';
             document.getElementById('btnManualRecord').textContent = '▶️ Старт / Стоп';
 
-            // Запись НЕ ВЕДЕТСЯ -> зажигаем КРАСНЫЙ!
+            // Запись НЕ ВЕДЕТСЯ -> КРАСНЫЙ свет
             sendLedCommand('RED');
-            log('⏹️ Запись остановлена (Диод КРАСНЫЙ). Отправляем аудио в Gemini...');
+            log('⏹️ Запись остановлена (На плате горит КРАСНЫЙ). ИИ Gemini 3.0 формирует конспект...');
         }
 
         function captureSlide() {
@@ -378,7 +378,7 @@
                 try {
                     data = JSON.parse(rawText);
                 } catch (e) {
-                    throw new Error('Сервер вернул страницу 404 вместо ответа ИИ. Проверьте, что на GitHub создан файл api/process.js и вы открыли сайт malinkiai.vercel.app!');
+                    throw new Error('Сервер вернул некорректный ответ. Подождите 15 секунд после обновления GitHub.');
                 }
 
                 if (!res.ok) throw new Error(data.error || 'Ошибка сервера Vercel');
@@ -398,7 +398,7 @@
 
                 document.getElementById('statusBadge').textContent = '🔴 Запись не ведется (Конспект готов!)';
                 document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-indigo-900 border border-indigo-700 text-xs font-bold';
-                log(`✨ УСПЕХ! Конспект "${data.title}" готов и опубликован во вкладке "Портал учеников"!`);
+                log(`✨ УСПЕХ! Конспект "${data.title}" опубликован! Откройте вкладку "Портал учеников".`);
             } catch (err) {
                 document.getElementById('statusBadge').textContent = '⚠️ Ошибка генерации';
                 log('Ошибка ИИ: ' + err.message, true);
