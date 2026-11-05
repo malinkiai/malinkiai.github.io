@@ -3,68 +3,126 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Малинки AI — Автоматический режим</title>
+    <title>Малинки AI — Автоматические ИИ-конспекты</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-indigo-950 text-white min-h-screen p-6 font-sans">
 
-    <div class="max-w-3xl mx-auto space-y-6">
-        <div class="flex items-center justify-between border-b border-indigo-800 pb-4">
+    <div class="max-w-4xl mx-auto space-y-6">
+        <!-- Шапка и вкладки -->
+        <div class="flex flex-wrap items-center justify-between border-b border-indigo-800 pb-4 gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-rose-500">Малинки AI</h1>
-                <p class="text-sm text-indigo-300">Управление одной кнопкой с устройства</p>
+                <p class="text-sm text-indigo-300">Умный комплекс записи уроков и генерации конспектов</p>
             </div>
-            <div id="statusBadge" class="px-5 py-2.5 rounded-full bg-indigo-900 border border-indigo-700 text-sm font-bold">
-                ⚪ Нажмите «Подготовить систему»
-            </div>
-        </div>
-
-        <div class="bg-indigo-900/60 border border-indigo-800 rounded-2xl p-6 text-center space-y-4">
-            <button id="btnOneClickSetup" class="w-full py-4 bg-rose-600 hover:bg-rose-500 rounded-2xl text-lg font-bold shadow-lg transition">
-                🚀 1 КЛИК: Подготовить систему к урокам
-            </button>
             
-            <div class="grid grid-cols-3 gap-2 text-xs pt-2">
-                <div id="serialStatus" class="p-2 rounded-lg bg-indigo-950 text-indigo-300">🔌 Плата: поиск...</div>
-                <div id="folderStatus" class="p-2 rounded-lg bg-indigo-950 text-indigo-300">📁 Сохранение: Авто</div>
-                <div id="mediaStatus" class="p-2 rounded-lg bg-indigo-950 text-indigo-300">🖥️ Экран: нет доступа</div>
-            </div>
-
-            <div class="flex justify-center gap-4 pt-1">
-                <button id="btnChangeFolder" class="text-xs text-indigo-400 hover:text-white underline">📁 Привязать папку флешки (Chrome/Edge)</button>
-                <button id="btnManualSerial" class="text-xs text-indigo-400 hover:text-white underline">🔌 Выбрать плату вручную</button>
+            <div class="flex bg-indigo-900 p-1 rounded-xl border border-indigo-700">
+                <button id="tabTeacher" class="px-4 py-2 rounded-lg bg-rose-600 text-white text-xs font-bold transition">
+                    👨‍🏫 Пульт учителя
+                </button>
+                <button id="tabStudent" class="px-4 py-2 rounded-lg text-indigo-300 hover:text-white text-xs font-bold transition">
+                    🎓 Портал учеников (<span id="cloudCount">0</span>)
+                </button>
             </div>
         </div>
 
-        <div class="grid md:grid-cols-2 gap-6">
-            <div class="bg-indigo-900/40 border border-indigo-800 rounded-2xl p-5 space-y-3">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-sm font-semibold text-indigo-200">Записанные уроки:</h3>
-                    <span id="lessonCounterUI" class="text-xs text-rose-400 font-bold">0 шт.</span>
+        <!-- ВКЛАДКА 1: ПУЛЬТ УЧИТЕЛЯ -->
+        <div id="viewTeacher" class="space-y-6">
+            <div class="bg-indigo-900/60 border border-indigo-800 rounded-2xl p-6 space-y-5">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex gap-3 items-center">
+                        <label class="text-xs text-indigo-300 font-semibold">Предмет и класс:</label>
+                        <select id="subjectSelect" class="bg-indigo-950 border border-indigo-700 rounded-xl px-3 py-2 text-sm font-semibold text-white">
+                            <option value="Физика • 9 класс">Физика • 9 класс</option>
+                            <option value="Алгебра • 10 класс">Алгебра • 10 класс</option>
+                            <option value="История • 8 класс">История • 8 класс</option>
+                            <option value="Информатика • 11 класс">Информатика • 11 класс</option>
+                            <option value="Биология • 7 класс">Биология • 7 класс</option>
+                        </select>
+                    </div>
+                    <div id="statusBadge" class="px-4 py-2 rounded-full bg-indigo-900 border border-indigo-700 text-xs font-bold">
+                        ⚪ Ожидание запуска
+                    </div>
                 </div>
-                <div id="downloadsList" class="space-y-2 max-h-40 overflow-y-auto text-xs">
-                    <p class="text-indigo-400">После нажатия кнопки BOOT файлы появятся здесь...</p>
+
+                <div class="flex gap-3">
+                    <button id="btnOneClickSetup" class="flex-1 py-4 bg-rose-600 hover:bg-rose-500 rounded-2xl text-lg font-bold shadow-lg transition">
+                        🚀 1 КЛИК: Подключить устройство, микрофон и экран
+                    </button>
+                    <button id="btnManualRecord" disabled class="px-5 py-4 bg-indigo-800 hover:bg-indigo-700 disabled:opacity-40 rounded-2xl text-sm font-bold transition" title="Запасная кнопка на случай теста без платы">
+                        ▶️ Старт / Стоп
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 text-xs">
+                    <div id="serialStatus" class="p-2.5 rounded-lg bg-indigo-950 text-indigo-300 text-center">🔌 Плата: поиск...</div>
+                    <div id="mediaStatus" class="p-2.5 rounded-lg bg-indigo-950 text-indigo-300 text-center">🎤 Микрофон и экран: не активны</div>
+                    <div class="p-2.5 rounded-lg bg-emerald-950/60 text-emerald-300 text-center font-semibold">🤖 Нейросеть Gemini: Подключена</div>
                 </div>
             </div>
 
-            <div class="bg-indigo-900/40 border border-indigo-800 rounded-2xl p-5 space-y-3">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-sm font-semibold text-indigo-200">Слайды текущего урока:</h3>
-                    <span id="slideCount" class="text-xs text-rose-400 font-bold">0 шт.</span>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-indigo-900/40 border border-indigo-800 rounded-2xl p-5 space-y-3">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-sm font-semibold text-indigo-200">Снимки экрана за урок:</h3>
+                        <span id="slideCount" class="text-xs text-rose-400 font-bold">0 шт.</span>
+                    </div>
+                    <video id="screenVideo" autoplay muted playsinline class="hidden"></video>
+                    <div id="slidesGallery" class="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto p-1">
+                        <p class="text-xs text-indigo-400 col-span-3">Слайды появятся здесь во время записи...</p>
+                    </div>
                 </div>
-                <video id="screenVideo" autoplay muted playsinline class="hidden"></video>
-                <div id="slidesGallery" class="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto p-1"></div>
+
+                <div class="bg-black/50 border border-indigo-800 rounded-2xl p-4">
+                    <h3 class="text-xs font-semibold text-indigo-400 mb-2">Системный журнал:</h3>
+                    <div id="logBox" class="font-mono text-xs text-emerald-400 space-y-1 max-h-36 overflow-y-auto">
+                        <div>[Система] Готова к работе.</div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="bg-black/50 border border-indigo-800 rounded-2xl p-4">
-            <div id="logBox" class="font-mono text-xs text-emerald-400 space-y-1 max-h-36 overflow-y-auto">
-                <div>[Система] Готова к автоподключению.</div>
+        <!-- ВКЛАДКА 2: ПОРТАЛ УЧЕНИКОВ -->
+        <div id="viewStudent" class="hidden space-y-6">
+            <div class="bg-indigo-900/40 border border-indigo-800 rounded-2xl p-6 space-y-4">
+                <div class="flex flex-wrap justify-between items-center gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">📚 Готовые конспекты уроков</h2>
+                        <p class="text-xs text-indigo-300">Материалы публикуются нейросетью автоматически сразу после окончания урока</p>
+                    </div>
+                    <button id="btnClearHistory" class="text-xs text-indigo-400 hover:text-rose-400 underline">Очистить тестовые записи</button>
+                </div>
+                <div id="studentFeed" class="space-y-4 pt-2">
+                    <p class="text-xs text-indigo-400">Запишите первый урок, и ИИ опубликует готовый конспект здесь...</p>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        // Переключение вкладок
+        const tabTeacher = document.getElementById('tabTeacher');
+        const tabStudent = document.getElementById('tabStudent');
+        const viewTeacher = document.getElementById('viewTeacher');
+        const viewStudent = document.getElementById('viewStudent');
+
+        function switchTab(mode) {
+            if (mode === 'teacher') {
+                viewTeacher.classList.remove('hidden');
+                viewStudent.classList.add('hidden');
+                tabTeacher.className = 'px-4 py-2 rounded-lg bg-rose-600 text-white text-xs font-bold transition';
+                tabStudent.className = 'px-4 py-2 rounded-lg text-indigo-300 hover:text-white text-xs font-bold transition';
+            } else {
+                viewStudent.classList.remove('hidden');
+                viewTeacher.classList.add('hidden');
+                tabStudent.className = 'px-4 py-2 rounded-lg bg-rose-600 text-white text-xs font-bold transition';
+                tabTeacher.className = 'px-4 py-2 rounded-lg text-indigo-300 hover:text-white text-xs font-bold transition';
+            }
+        }
+
+        tabTeacher.addEventListener('click', () => switchTab('teacher'));
+        tabStudent.addEventListener('click', () => switchTab('student'));
+
         function log(msg, isError = false) {
             const box = document.getElementById('logBox');
             const div = document.createElement('div');
@@ -74,7 +132,7 @@
             box.scrollTop = box.scrollHeight;
         }
 
-        // --- 1. ПЛАТА RP2040-ZERO ---
+        // --- 1. ПОДКЛЮЧЕНИЕ ПЛАТЫ RP2040-ZERO ---
         let port = null, writer = null, isReadingSerial = false;
 
         async function connectSerial(selectedPort) {
@@ -85,8 +143,8 @@
                 isReadingSerial = true;
 
                 document.getElementById('serialStatus').textContent = '🔌 Плата: Подключена ✅';
-                document.getElementById('serialStatus').className = 'p-2 rounded-lg bg-emerald-900/60 text-emerald-300 font-semibold';
-                log('Плата RP2040 подключена!');
+                document.getElementById('serialStatus').className = 'p-2.5 rounded-lg bg-emerald-900/60 text-emerald-300 font-semibold text-center';
+                log('Плата RP2040-Zero подключена!');
 
                 const textEncoder = new TextEncoderStream();
                 textEncoder.readable.pipeTo(port.writable);
@@ -104,7 +162,7 @@
                         buffer += value;
                         if (buffer.includes('CLICK')) {
                             buffer = "";
-                            log('🔘 Сигнал CLICK от кнопки BOOT!');
+                            log('🔘 Нажата физическая кнопка на плате!');
                             toggleRecording();
                         }
                         if (buffer.length > 50) buffer = "";
@@ -122,98 +180,73 @@
             }
         }
 
-        // Автоподключение знакомой платы при старте
+        // Автоподключение платы и загрузка сохраненных конспектов при старте
+        let savedLessons = JSON.parse(localStorage.getItem('malinki_lessons') || '[]');
+
         window.addEventListener('DOMContentLoaded', async () => {
             if ('serial' in navigator) {
                 const ports = await navigator.serial.getPorts();
                 if (ports.length > 0) connectSerial(ports[0]);
             }
+            renderAllLessons();
         });
 
-        // --- 2. ПОДГОТОВКА В 1 КЛИК (БЕЗ ОШИБКИ OPERA) ---
-        let directoryHandle = null;
+        // --- 2. ПОДГОТОВКА В 1 КЛИК (ПЛАТА + МИКРОФОН + ЭКРАН) ---
         let audioStream = null, screenStream = null, mediaRecorder = null;
-        let audioChunks = [], isRecording = false, slideInterval = null, slidesCaptured = 0;
-        let lessonCount = 0, lastToggleTime = 0;
-
-        function createSilentAudioStream() {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            gain.gain.value = 0.001;
-            const dest = ctx.createMediaStreamDestination();
-            osc.connect(gain);
-            gain.connect(dest);
-            osc.start();
-            return dest.stream;
-        }
+        let audioChunks = [], currentSlides = [], isRecording = false, slideInterval = null;
+        let lastToggleTime = 0;
 
         document.getElementById('btnOneClickSetup').addEventListener('click', async () => {
             try {
-                // 1. Подключаем плату, если еще не подключена
+                // Подключаем плату, если еще не подключена
                 if (!isReadingSerial && 'serial' in navigator) {
-                    const ports = await navigator.serial.getPorts();
-                    if (ports.length > 0) {
-                        connectSerial(ports[0]);
-                    } else {
-                        const newPort = await navigator.serial.requestPort();
-                        connectSerial(newPort);
+                    try {
+                        const ports = await navigator.serial.getPorts();
+                        if (ports.length > 0) await connectSerial(ports[0]);
+                        else await connectSerial(await navigator.serial.requestPort());
+                    } catch (e) {
+                        log('Плата не выбрана, можно управлять кнопкой на экране.');
                     }
                 }
 
-                // 2. Микрофон (или бесшумная заглушка)
-                try {
-                    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                } catch (e) {
-                    audioStream = createSilentAudioStream();
-                    log('Микрофон не найден, включена бесшумная заглушка.');
-                }
+                // Подключаем новый микрофон с шумоподавлением
+                audioStream = await navigator.mediaDevices.getUserMedia({
+                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                });
+                const micLabel = audioStream.getAudioTracks()[0].label || 'USB Микрофон';
+                log('🎤 Микрофон подключен: ' + micLabel);
 
-                // 3. Захват экрана
+                // Подключаем захват экрана
                 screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
                 const video = document.getElementById('screenVideo');
                 video.srcObject = screenStream;
                 await video.play();
 
-                document.getElementById('mediaStatus').textContent = '🖥️ Экран: Готов ✅';
-                document.getElementById('mediaStatus').className = 'p-2 rounded-lg bg-emerald-900/60 text-emerald-300 font-semibold';
+                document.getElementById('mediaStatus').textContent = '🎤 Микрофон и экран: Готовы ✅';
+                document.getElementById('mediaStatus').className = 'p-2.5 rounded-lg bg-emerald-900/60 text-emerald-300 font-semibold text-center';
                 
-                document.getElementById('btnOneClickSetup').textContent = '✅ СИСТЕМА ГОТОВА — ЖМИТЕ КНОПКУ BOOT НА ПЛАТЕ';
-                document.getElementById('btnOneClickSetup').className = 'w-full py-4 bg-emerald-700 rounded-2xl text-lg font-bold shadow-lg';
-                document.getElementById('statusBadge').textContent = '🟢 Ожидание кнопки BOOT';
+                document.getElementById('btnOneClickSetup').textContent = '✅ СИСТЕМА АКТИВНА — УПРАВЛЯЙТЕ КНОПКОЙ НА ПЛАТЕ';
+                document.getElementById('btnOneClickSetup').className = 'flex-1 py-4 bg-emerald-700 rounded-2xl text-lg font-bold shadow-lg';
+                document.getElementById('btnManualRecord').disabled = false;
+                document.getElementById('statusBadge').textContent = '🟢 Ожидание старта урока';
                 
                 sendLedCommand('BLUE');
-                log('🎉 Система готова! Нажимайте кнопку BOOT на плате для старта и остановки уроков.');
+                log('🎉 Всё готово! Нажмите кнопку BOOT на плате, чтобы начать запись.');
             } catch (err) {
-                log('Настройка прервана: ' + err.message, true);
+                log('Ошибка доступа: ' + err.message, true);
             }
         });
 
-        // Опциональная привязка папки (вызывается напрямую от клика, чтобы браузер не ругался)
-        document.getElementById('btnChangeFolder').addEventListener('click', async () => {
-            try {
-                directoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-                document.getElementById('folderStatus').textContent = `📁 Флешка: ${directoryHandle.name} ✅`;
-                document.getElementById('folderStatus').className = 'p-2 rounded-lg bg-emerald-900/60 text-emerald-300 font-semibold';
-                log(`✅ Папка "${directoryHandle.name}" привязана для прямого сохранения!`);
-            } catch (err) {
-                log('Ваш браузер блокирует выбор папок (в Opera это нормально), используем стандартное автоскачивание.', true);
-            }
-        });
+        document.getElementById('btnManualRecord').addEventListener('click', toggleRecording);
 
-        document.getElementById('btnManualSerial').addEventListener('click', async () => {
-            const newPort = await navigator.serial.requestPort();
-            connectSerial(newPort);
-        });
-
-        // --- 3. ЦИКЛИЧНЫЙ СТАРТ / СТОП ПО КНОПКЕ BOOT ---
+        // --- 3. ЗАПИСЬ УРОКА И ОТПРАВКА В GEMINI ---
         function toggleRecording() {
             const now = Date.now();
             if (now - lastToggleTime < 1000) return;
             lastToggleTime = now;
 
             if (!audioStream || !screenStream) {
-                log('Сначала нажмите большую кнопку "1 КЛИК: Подготовить систему"!', true);
+                log('Сначала нажмите розовую кнопку "1 КЛИК"!', true);
                 return;
             }
             if (!isRecording) startRecording();
@@ -223,106 +256,178 @@
         function startRecording() {
             isRecording = true;
             audioChunks = [];
-            slidesCaptured = 0;
+            currentSlides = [];
             document.getElementById('slideCount').textContent = '0 шт.';
             document.getElementById('slidesGallery').innerHTML = '';
 
-            // Экономный голосовой битрейт 32 кбит/с (45 минут = всего ~10 МБ)
             mediaRecorder = new MediaRecorder(audioStream, { audioBitsPerSecond: 32000 });
             mediaRecorder.ondataavailable = e => {
                 if (e.data && e.data.size > 0) audioChunks.push(e.data);
             };
-            mediaRecorder.onstop = saveResults;
+            mediaRecorder.onstop = processWithAI;
             mediaRecorder.start(1000);
 
             captureSlide();
-            slideInterval = setInterval(captureSlide, 5000);
+            slideInterval = setInterval(captureSlide, 8000);
 
-            document.getElementById('statusBadge').textContent = `🔴 ИДЕТ ЗАПИСЬ УРОКА #${lessonCount + 1}`;
-            document.getElementById('statusBadge').className = 'px-5 py-2.5 rounded-full bg-rose-600 text-white text-sm font-bold animate-pulse';
+            document.getElementById('statusBadge').textContent = '🔴 ИДЕТ ЗАПИСЬ УРОКА';
+            document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-rose-600 text-white text-xs font-bold animate-pulse';
+            document.getElementById('btnManualRecord').textContent = '⏹️ Остановить';
             
             sendLedCommand('RED');
-            log(`▶️ УРОК #${lessonCount + 1}: Запись началась! (Диод КРАСНЫЙ)`);
+            log('▶️ Запись началась! Говорите в микрофон...');
         }
 
         function stopRecording() {
             isRecording = false;
             clearInterval(slideInterval);
-            
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                 mediaRecorder.stop();
             }
 
-            document.getElementById('statusBadge').textContent = '🟢 Урок сохранен (Готов к следующему)';
-            document.getElementById('statusBadge').className = 'px-5 py-2.5 rounded-full bg-emerald-700 text-white text-sm font-bold';
+            document.getElementById('statusBadge').textContent = '🤖 ИИ Gemini пишет конспект...';
+            document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-amber-600 text-white text-xs font-bold animate-pulse';
+            document.getElementById('btnManualRecord').textContent = '▶️ Старт / Стоп';
 
             sendLedCommand('GREEN');
-            log('⏹️ Запись остановлена! Сохраняем... (Диод ЗЕЛЕНЫЙ)');
+            log('⏹️ Запись остановлена! Отправляем аудио в нейросеть Gemini...');
         }
 
         function captureSlide() {
             const video = document.getElementById('screenVideo');
-            if (!video.videoWidth) return;
+            if (!video.videoWidth || currentSlides.length >= 6) return;
 
             const canvas = document.createElement('canvas');
-            canvas.width = 320;
-            canvas.height = 180;
+            canvas.width = 480;
+            canvas.height = 270;
             canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            slidesCaptured++;
-            document.getElementById('slideCount').textContent = slidesCaptured + ' шт.';
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+            currentSlides.push(dataUrl);
+            document.getElementById('slideCount').textContent = currentSlides.length + ' шт.';
 
             const img = document.createElement('img');
-            img.src = canvas.toDataURL('image/jpeg', 0.6);
+            img.src = dataUrl;
             img.className = 'rounded border border-indigo-600 w-full h-16 object-cover';
             document.getElementById('slidesGallery').appendChild(img);
         }
 
-        async function saveResults() {
-            lessonCount++;
-            document.getElementById('lessonCounterUI').textContent = `${lessonCount} шт.`;
+        function blobToBase64(blob) {
+            return new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                reader.readAsDataURL(blob);
+            });
+        }
 
-            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            const audioUrl = URL.createObjectURL(audioBlob);
-            const sizeKB = Math.max(1, Math.round(audioBlob.size / 1024));
-            const fileName = `Урок_${lessonCount}_Малинки.webm`;
+        async function processWithAI() {
+            try {
+                const subject = document.getElementById('subjectSelect').value;
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const audioBase64 = await blobToBase64(audioBlob);
 
-            if (directoryHandle) {
-                try {
-                    const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
-                    const writable = await fileHandle.createWritable();
-                    await writable.write(audioBlob);
-                    await writable.close();
-                    log(`💾 "${fileName}" (${sizeKB} КБ) записан напрямую на флешку!`);
-                } catch (err) {
-                    log('Ошибка записи в папку, скачиваем стандартно...', true);
-                    triggerDownload(audioUrl, fileName);
-                }
-            } else {
-                triggerDownload(audioUrl, fileName);
-                log(`💾 "${fileName}" (${sizeKB} КБ) сохранен!`);
+                const res = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        audioBase64,
+                        subject,
+                        slides: currentSlides
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Ошибка сервера Vercel');
+
+                const newLesson = {
+                    id: Date.now(),
+                    subject,
+                    title: data.title,
+                    summary: data.summary,
+                    slides: currentSlides,
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                };
+
+                savedLessons.unshift(newLesson);
+                localStorage.setItem('malinki_lessons', JSON.stringify(savedLessons.slice(0, 15)));
+                renderAllLessons();
+
+                document.getElementById('statusBadge').textContent = '🟢 Конспект готов!';
+                document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-emerald-700 text-white text-xs font-bold';
+                log(`✨ Готово! Конспект "${data.title}" опубликован на портале учеников.`);
+            } catch (err) {
+                document.getElementById('statusBadge').textContent = '⚠️ Ошибка генерации';
+                document.getElementById('statusBadge').className = 'px-4 py-2 rounded-full bg-rose-800 text-white text-xs font-bold';
+                log('Ошибка ИИ: ' + err.message, true);
+            }
+        }
+
+        // --- 4. ОТРИСОВКА ПОРТАЛА УЧЕНИКОВ И СКАЧИВАНИЕ WORD ---
+        function renderAllLessons() {
+            const feed = document.getElementById('studentFeed');
+            document.getElementById('cloudCount').textContent = savedLessons.length;
+
+            if (savedLessons.length === 0) {
+                feed.innerHTML = '<p class="text-xs text-indigo-400">Запишите первый урок, и ИИ опубликует готовый конспект здесь...</p>';
+                return;
             }
 
-            const list = document.getElementById('downloadsList');
-            if (lessonCount === 1) list.innerHTML = '';
-            const item = document.createElement('div');
-            item.className = 'p-2 bg-indigo-950 border border-indigo-700 rounded-lg flex justify-between items-center';
-            item.innerHTML = `
-                <span class="font-bold text-emerald-400">✅ ${fileName} (${sizeKB} КБ, слайдов: ${slidesCaptured})</span>
-                <a href="${audioUrl}" download="${fileName}" class="px-2 py-1 bg-rose-600 hover:bg-rose-500 rounded text-white font-semibold">Скачать</a>
-            `;
-            list.prepend(item);
+            feed.innerHTML = '';
+            savedLessons.forEach((item, idx) => {
+                const card = document.createElement('div');
+                card.className = 'p-5 bg-indigo-950 border border-indigo-700 rounded-2xl space-y-4';
+                card.innerHTML = `
+                    <div class="flex flex-wrap justify-between items-start gap-2">
+                        <div>
+                            <span class="text-xs px-2.5 py-1 rounded bg-rose-600 text-white font-bold">${item.subject}</span>
+                            <h3 class="font-bold text-lg mt-2 text-white">${item.title}</h3>
+                            <p class="text-xs text-indigo-400">Опубликовано в ${item.time} • Слайдов: ${item.slides.length}</p>
+                        </div>
+                        <button onclick="downloadWord(${idx})" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold transition shadow">
+                            📄 Скачать Word (.doc)
+                        </button>
+                    </div>
+                    <div class="text-sm text-indigo-100 whitespace-pre-line bg-indigo-900/40 p-4 rounded-xl border border-indigo-800 leading-relaxed">${item.summary}</div>
+                    ${item.slides.length > 0 ? `
+                        <div class="grid grid-cols-3 gap-2 pt-1">
+                            ${item.slides.map(s => `<img src="${s}" class="rounded-lg border border-indigo-700 w-full h-24 object-cover">`).join('')}
+                        </div>
+                    ` : ''}
+                `;
+                feed.appendChild(card);
+            });
         }
 
-        function triggerDownload(url, name) {
+        window.downloadWord = function(index) {
+            const item = savedLessons[index];
+            if (!item) return;
+            const slidesHtml = item.slides.map(s => `<p><img src="${s}" width="450" /></p>`).join('');
+            const htmlContent = `
+                <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+                <head><meta charset="utf-8"><title>${item.title}</title></head>
+                <body style="font-family: Arial, sans-serif; line-height: 1.5;">
+                    <p style="color: #e11d48; font-weight: bold;">${item.subject} • Малинки AI</p>
+                    <h1>${item.title}</h1>
+                    <div style="white-space: pre-line; margin-bottom: 20px;">${item.summary}</div>
+                    <h3>Материалы с экрана:</h3>
+                    ${slidesHtml}
+                </body></html>
+            `;
+            const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
+            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.style.display = 'none';
             a.href = url;
-            a.download = name;
+            a.download = `Конспект_${item.title.replace(/[^а-яА-Яa-zA-Z0-9]/g, '_')}.doc`;
             document.body.appendChild(a);
             a.click();
-            setTimeout(() => document.body.removeChild(a), 1000);
-        }
+            document.body.removeChild(a);
+        };
+
+        document.getElementById('btnClearHistory').addEventListener('click', () => {
+            savedLessons = [];
+            localStorage.removeItem('malinki_lessons');
+            renderAllLessons();
+        });
     </script>
 </body>
 </html>
