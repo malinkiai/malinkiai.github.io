@@ -182,22 +182,29 @@
         document.getElementById('btnRefreshCloud').addEventListener('click', fetchCloudLessons);
 
         // --- 1. БЕЗОТКАЗНОЕ ЧТЕНИЕ КНОПКИ ПЛАТЫ (ТОЛЬКО ПРИЕМ, БЕЗ ЗАВИСАНИЙ ПОТОКА) ---
-        let port = null, isReadingSerial = false;
+        // --- 1. УДЕРЖАНИЕ СВЯЗИ С ПЛАТОЙ ---
+        let port = null, isReadingSerial = false, keepAliveTimer = null;
 
         async function connectSerial(selectedPort) {
             if (isReadingSerial) return;
             try {
                 port = selectedPort;
                 await port.open({ baudRate: 115200 });
-                // Удерживаем линию DTR открытой, чтобы плата отправляла все нажатия без ограничений
-                try {
-                    await port.setSignals({ dataTerminalReady: true, requestToSend: true });
-                } catch (e) {}
-
                 isReadingSerial = true;
+
+                // Каждую секунду подтверждаем плате, что браузер на связи (чтобы USB не засыпал после 1-го клика!)
+                if (keepAliveTimer) clearInterval(keepAliveTimer);
+                keepAliveTimer = setInterval(async () => {
+                    if (port && isReadingSerial) {
+                        try {
+                            await port.setSignals({ dataTerminalReady: true, requestToSend: true });
+                        } catch (e) {}
+                    }
+                }, 1000);
+
                 document.getElementById('serialStatus').textContent = '🔌 Плата: Подключена ✅';
                 document.getElementById('serialStatus').className = 'p-2.5 rounded-lg bg-emerald-900/60 text-emerald-300 font-semibold text-center';
-                log('Плата RP2040 подключена! Слушаю нажатия кнопки BOOT...');
+                log('Плата RP2040 подключена! Готова к работе.');
 
                 readSerialForever();
             } catch (err) {
@@ -209,31 +216,24 @@
         async function readSerialForever() {
             const decoder = new TextDecoder();
             while (port && port.readable) {
-                let reader = null;
+                const reader = port.readable.getReader();
                 try {
-                    reader = port.readable.getReader();
-                    let buffer = "";
                     while (true) {
                         const { value, done } = await reader.read();
                         if (done) break;
                         if (value && value.length > 0) {
-                            buffer += decoder.decode(value, { stream: true });
-                            if (buffer.includes('CLICK')) {
-                                buffer = "";
-                                log('🔘 Нажата кнопка BOOT на плате!');
+                            const text = decoder.decode(value, { stream: true });
+                            // Реагируем на любой пришедший пакет с буквами от CLICK
+                            if (text.includes('C') || text.includes('L') || text.includes('K')) {
                                 toggleRecording();
                             }
-                            if (buffer.length > 40) buffer = "";
                         }
                     }
                 } catch (err) {
-                    // Если при нажатии проскочила помеха USB, автоматически переоткрываем чтение через 100 мс
+                    await new Promise(r => setTimeout(r, 150));
                 } finally {
-                    if (reader) {
-                        try { reader.releaseLock(); } catch (e) {}
-                    }
+                    try { reader.releaseLock(); } catch (e) {}
                 }
-                await new Promise(r => setTimeout(r, 100));
             }
             isReadingSerial = false;
         }
@@ -296,8 +296,10 @@
 
         function toggleRecording() {
             const now = Date.now();
-            if (now - lastToggleTime < 500) return;
+            if (now - lastToggleTime < 1200) return; // Игнорируем дубли пакета в течение 1.2 сек
             lastToggleTime = now;
+
+            log('🔘 Сигнал от кнопки BOOT получен!');
 
             if (!combinedAudioStream || !screenStream) {
                 log('Сначала нажмите кнопку "1 КЛИК" на экране!', true);
@@ -330,7 +332,7 @@
                 mediaRecorder.onstop = processWithAI;
                 mediaRecorder.start(1000);
 
-                captureSlide();
+                setTimeout(captureSlide, 500); // Делаем первый скриншот через 0.5 сек, чтобы не мешать USB!
                 slideInterval = setInterval(captureSlide, 10000);
 
                 document.getElementById('statusBadge').textContent = '🟢 ИДЕТ ЗАПИСЬ УРОКА (+)';
