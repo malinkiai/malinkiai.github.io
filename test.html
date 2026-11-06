@@ -96,7 +96,7 @@
             </div>
         </div>
 
-        <!-- ВКЛАДКА УЧЕНИКОВ (ОБЩАЯ ДЛЯ ВСЕХ УСТРОЙСТВ) -->
+        <!-- ВКЛАДКА УЧЕНИКОВ -->
         <div id="viewStudent" class="hidden space-y-6">
             <div class="bg-indigo-900/40 border border-indigo-800 rounded-2xl p-6 space-y-4">
                 <div class="flex flex-wrap justify-between items-center gap-4">
@@ -143,7 +143,7 @@
             viewTeacher.classList.add('hidden');
             tabStudent.className = 'px-4 py-2 rounded-lg bg-rose-600 text-white text-xs font-bold transition';
             tabTeacher.className = 'px-4 py-2 rounded-lg text-indigo-300 hover:text-white text-xs font-bold transition';
-            fetchCloudLessons(); // Подгружаем свежие конспекты с сервера при открытии вкладки
+            fetchCloudLessons();
         });
 
         function log(msg, isError = false) {
@@ -168,7 +168,6 @@
                 if (!res.ok) return;
                 const data = await res.json();
                 if (Array.isArray(data.lessons)) {
-                    // Объединяем серверные уроки и локальные без дубликатов
                     const map = new Map();
                     [...data.lessons, ...allLessons].forEach(item => {
                         if (item && item.id) map.set(item.id, item);
@@ -182,59 +181,61 @@
 
         document.getElementById('btnRefreshCloud').addEventListener('click', fetchCloudLessons);
 
-        // --- 1. ПОДКЛЮЧЕНИЕ ПЛАТЫ ---
-        let port = null, writer = null, isReadingSerial = false;
+        // --- 1. БЕЗОТКАЗНОЕ ЧТЕНИЕ КНОПКИ ПЛАТЫ (ТОЛЬКО ПРИЕМ, БЕЗ ЗАВИСАНИЙ ПОТОКА) ---
+        let port = null, isReadingSerial = false;
 
         async function connectSerial(selectedPort) {
             if (isReadingSerial) return;
             try {
                 port = selectedPort;
                 await port.open({ baudRate: 115200 });
-                isReadingSerial = true;
+                // Удерживаем линию DTR открытой, чтобы плата отправляла все нажатия без ограничений
+                try {
+                    await port.setSignals({ dataTerminalReady: true, requestToSend: true });
+                } catch (e) {}
 
+                isReadingSerial = true;
                 document.getElementById('serialStatus').textContent = '🔌 Плата: Подключена ✅';
                 document.getElementById('serialStatus').className = 'p-2.5 rounded-lg bg-emerald-900/60 text-emerald-300 font-semibold text-center';
-                log('Плата RP2040 подключена!');
+                log('Плата RP2040 подключена! Слушаю нажатия кнопки BOOT...');
 
-                const textEncoder = new TextEncoderStream();
-                textEncoder.readable.pipeTo(port.writable);
-                writer = textEncoder.writable.getWriter();
-
-                startReadingButton();
+                readSerialForever();
             } catch (err) {
                 isReadingSerial = false;
                 log('USB: ' + err.message, true);
             }
         }
 
-        async function startReadingButton() {
-            try {
-                const textDecoder = new TextDecoderStream();
-                port.readable.pipeTo(textDecoder.writable);
-                const reader = textDecoder.readable.getReader();
-                let buffer = "";
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    if (value) {
-                        buffer += value;
-                        if (buffer.includes('CLICK')) {
-                            buffer = "";
-                            log('🔘 Нажата кнопка BOOT на плате!');
-                            toggleRecording();
+        async function readSerialForever() {
+            const decoder = new TextDecoder();
+            while (port && port.readable) {
+                let reader = null;
+                try {
+                    reader = port.readable.getReader();
+                    let buffer = "";
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        if (value && value.length > 0) {
+                            buffer += decoder.decode(value, { stream: true });
+                            if (buffer.includes('CLICK')) {
+                                buffer = "";
+                                log('🔘 Нажата кнопка BOOT на плате!');
+                                toggleRecording();
+                            }
+                            if (buffer.length > 40) buffer = "";
                         }
-                        if (buffer.length > 50) buffer = "";
+                    }
+                } catch (err) {
+                    // Если при нажатии проскочила помеха USB, автоматически переоткрываем чтение через 100 мс
+                } finally {
+                    if (reader) {
+                        try { reader.releaseLock(); } catch (e) {}
                     }
                 }
-            } catch (err) {
-                isReadingSerial = false;
+                await new Promise(r => setTimeout(r, 100));
             }
-        }
-
-        async function syncBoardLed(charCmd) {
-            if (writer) {
-                try { await writer.write(charCmd); } catch (e) {}
-            }
+            isReadingSerial = false;
         }
 
         // --- 2. ЗАПУСК В 1 КЛИК ---
@@ -285,8 +286,7 @@
                 document.getElementById('btnManualRecord').disabled = false;
                 document.getElementById('statusBadge').textContent = '🔴 Стоп (Жду нажатия BOOT)';
 
-                await syncBoardLed('R');
-                log('🎉 Система готова! Диод КРАСНЫЙ. Нажмите BOOT на плате для старта записи.');
+                log('🎉 Система готова! Нажимайте кнопку BOOT для старта и остановки записи.');
             } catch (err) {
                 log('Ошибка доступа: ' + err.message, true);
             }
@@ -296,55 +296,70 @@
 
         function toggleRecording() {
             const now = Date.now();
-            if (now - lastToggleTime < 800) return;
+            if (now - lastToggleTime < 500) return;
             lastToggleTime = now;
 
             if (!combinedAudioStream || !screenStream) {
-                log('Сначала нажмите кнопку "1 КЛИК"!', true);
+                log('Сначала нажмите кнопку "1 КЛИК" на экране!', true);
                 return;
             }
-            if (!isRecording) startRecording();
-            else stopRecording();
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
         }
 
         function startRecording() {
-            isRecording = true;
-            audioChunks = [];
-            currentSlides = [];
-            document.getElementById('slideCount').textContent = '0 шт.';
-            document.getElementById('slidesGallery').innerHTML = '';
+            try {
+                isRecording = true;
+                audioChunks = [];
+                currentSlides = [];
+                document.getElementById('slideCount').textContent = '0 шт.';
+                document.getElementById('slidesGallery').innerHTML = '';
 
-            const options = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-                ? { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 24000 }
-                : { audioBitsPerSecond: 24000 };
+                try {
+                    mediaRecorder = new MediaRecorder(combinedAudioStream, { mimeType: 'audio/webm' });
+                } catch (e) {
+                    mediaRecorder = new MediaRecorder(combinedAudioStream);
+                }
 
-            mediaRecorder = new MediaRecorder(combinedAudioStream, options);
-            mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) audioChunks.push(e.data); };
-            mediaRecorder.onstop = processWithAI;
-            mediaRecorder.start(1000);
+                mediaRecorder.ondataavailable = e => {
+                    if (e.data && e.data.size > 0) audioChunks.push(e.data);
+                };
+                mediaRecorder.onstop = processWithAI;
+                mediaRecorder.start(1000);
 
-            captureSlide();
-            slideInterval = setInterval(captureSlide, 10000);
+                captureSlide();
+                slideInterval = setInterval(captureSlide, 10000);
 
-            document.getElementById('statusBadge').textContent = '🟢 ИДЕТ ЗАПИСЬ УРОКА (+)';
-            document.getElementById('statusBadge').className = 'px-4 py-2.5 rounded-full bg-emerald-600 text-white text-xs font-bold animate-pulse';
-            document.getElementById('btnManualRecord').textContent = '⏹️ Остановить';
+                document.getElementById('statusBadge').textContent = '🟢 ИДЕТ ЗАПИСЬ УРОКА (+)';
+                document.getElementById('statusBadge').className = 'px-4 py-2.5 rounded-full bg-emerald-600 text-white text-xs font-bold animate-pulse';
+                document.getElementById('btnManualRecord').textContent = '⏹️ Остановить';
 
-            syncBoardLed('G');
-            log(`▶️ Запись началась (${getFullSubject()})! На плате горит ЗЕЛЕНЫЙ.`);
+                log(`▶️ Запись началась (${getFullSubject()})! Нажмите BOOT еще раз для остановки.`);
+            } catch (err) {
+                isRecording = false;
+                log('Ошибка старта записи: ' + err.message, true);
+            }
         }
 
         function stopRecording() {
-            isRecording = false;
-            clearInterval(slideInterval);
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+            try {
+                isRecording = false;
+                clearInterval(slideInterval);
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                }
 
-            document.getElementById('statusBadge').textContent = '🤖 ИИ анализирует слайды и звук...';
-            document.getElementById('statusBadge').className = 'px-4 py-2.5 rounded-full bg-amber-600 text-white text-xs font-bold animate-pulse';
-            document.getElementById('btnManualRecord').textContent = '▶️ Старт / Стоп';
+                document.getElementById('statusBadge').textContent = '🤖 ИИ анализирует слайды и звук...';
+                document.getElementById('statusBadge').className = 'px-4 py-2.5 rounded-full bg-amber-600 text-white text-xs font-bold animate-pulse';
+                document.getElementById('btnManualRecord').textContent = '▶️ Старт / Стоп';
 
-            syncBoardLed('R');
-            log('⏹️ Запись остановлена (Диод КРАСНЫЙ). Публикуем конспект на сервере...');
+                log('⏹️ Запись остановлена! Публикуем конспект на сервере...');
+            } catch (err) {
+                log('Ошибка остановки: ' + err.message, true);
+            }
         }
 
         function captureSlide() {
@@ -408,7 +423,7 @@
 
                 document.getElementById('statusBadge').textContent = '🔴 Стоп (Опубликовано для всех!)';
                 document.getElementById('statusBadge').className = 'px-4 py-2.5 rounded-full bg-indigo-900 border border-indigo-700 text-xs font-bold';
-                log(`✨ ГОТОВО! Конспект "${data.title}" опубликован на сервере и доступен всем ученикам!`);
+                log(`✨ ГОТОВО! Конспект "${data.title}" опубликован и доступен всем ученикам!`);
             } catch (err) {
                 document.getElementById('statusBadge').textContent = '⚠️ Ошибка ИИ';
                 log('Ошибка ИИ: ' + err.message, true);
@@ -499,7 +514,6 @@
             }
             renderAllLessons();
             fetchCloudLessons();
-            // Автообновление списка для учеников каждые 15 секунд
             setInterval(fetchCloudLessons, 15000);
         });
     </script>
