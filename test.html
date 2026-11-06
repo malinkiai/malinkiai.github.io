@@ -245,7 +245,7 @@
 
         document.getElementById('btnOneClickSetup').addEventListener('click', async () => {
             try {
-                if (!isReadingSerial && 'serial' in navigator) {
+                if (!port && 'serial' in navigator) {
                     try {
                         const ports = await navigator.serial.getPorts();
                         if (ports.length > 0) await connectSerial(ports[0]);
