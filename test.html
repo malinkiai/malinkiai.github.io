@@ -189,27 +189,54 @@
         }
 
         async function startReadingButton() {
-            try {
-                const textDecoder = new TextDecoderStream();
-                port.readable.pipeTo(textDecoder.writable);
-                const reader = textDecoder.readable.getReader();
-                let buffer = "";
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    if (value) {
-                        buffer += value;
-                        if (buffer.includes('CLICK')) {
-                            buffer = "";
-                            log('🔘 Сигнал с платы! Переключаю запись...');
-                            toggleRecording();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            log('👂 Слушаю кнопку на плате...');
+
+            while (port && port.readable) {
+                let reader = null;
+                try {
+                    reader = port.readable.getReader();
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        if (value) {
+                            buffer += decoder.decode(value, { stream: true });
+                            const lines = buffer.split('\n');
+                            buffer = lines.pop();
+
+                            for (const line of lines) {
+                                const cleanLine = line.trim();
+                                if (!cleanLine) continue;
+
+                                log(`🔘 Сигнал с платы: ${cleanLine}`);
+
+                                if (!combinedAudioStream || !screenStream) {
+                                    log('Сначала нажмите кнопку "1 КЛИК"!', true);
+                                    continue;
+                                }
+
+                                // Жесткая привязка команды к действию (невозможно рассинхронизировать!)
+                                if (cleanLine.includes('REC_START')) {
+                                    if (!isRecording) startRecording();
+                                } else if (cleanLine.includes('REC_STOP')) {
+                                    if (isRecording) stopRecording();
+                                } else if (cleanLine.includes('CLICK')) {
+                                    toggleRecording();
+                                }
+                            }
                         }
-                        if (buffer.length > 50) buffer = "";
+                    }
+                } catch (err) {
+                    log('🔄 Переподключение потока USB...');
+                } finally {
+                    if (reader) {
+                        try { reader.releaseLock(); } catch (e) {}
                     }
                 }
-            } catch (err) {
-                isReadingSerial = false;
+                await new Promise(r => setTimeout(r, 100));
             }
+            isReadingSerial = false;
         }
 
         let combinedAudioStream = null, screenStream = null, mediaRecorder = null;
